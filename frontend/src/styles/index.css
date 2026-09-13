@@ -1232,6 +1232,61 @@ html, body, #root {
   animation: fadeIn 0.15s ease;
 }
 
+.modal-backdrop.image-lightbox {
+  padding: 0;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.82);
+  backdrop-filter: blur(8px);
+  z-index: 9999;
+}
+
+.lightbox-content {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  max-width: 92vw;
+  max-height: 90vh;
+}
+
+.lightbox-img {
+  max-width: 90vw;
+  max-height: 85vh;
+  border-radius: 8px;
+  box-shadow: var(--shadow-lg);
+  object-fit: contain;
+  border: 1px solid var(--border-subtle);
+  background: #000;
+}
+
+.lightbox-close-btn {
+  position: absolute;
+  top: -16px;
+  right: -16px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #1f242c;
+  color: #f0f6fc;
+  border: 1px solid var(--border-default);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  transition: all 0.15s ease;
+  z-index: 10;
+}
+
+.lightbox-close-btn:hover {
+  background: var(--status-error);
+  color: white;
+  border-color: var(--status-error);
+  transform: scale(1.08);
+}
+
 /* Excalidraw Style Command Palette */
 .command-palette {
   width: 100%;

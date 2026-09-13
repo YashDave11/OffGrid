@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Upload, FileText, Loader2, Library, CheckCircle2, Trash2 } from 'lucide-react';
+import { Upload, FileText, Loader2, Library, CheckCircle2, Trash2, Image } from 'lucide-react';
 
 interface KBDocument {
   document_name: string;
@@ -61,8 +61,8 @@ export const KnowledgeBase: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.type !== 'application/pdf') {
-      alert('Only PDF files are supported for the Knowledge Base.');
+    if (file.type !== 'application/pdf' && !file.type.startsWith('image/')) {
+      alert('Only PDF and image files are supported for the Knowledge Base.');
       return;
     }
 
@@ -117,12 +117,12 @@ export const KnowledgeBase: React.FC = () => {
       <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '1.5rem', marginBottom: '2rem' }}>
         <h3 style={{ margin: '0 0 1rem 0', color: 'var(--text-primary)' }}>Add to Knowledge Base</h3>
         <p style={{ margin: '0 0 1.5rem 0', color: 'var(--text-muted)', fontSize: '14px' }}>
-          Upload PDF documents to automatically embed and index them for global retrieval.
+          Upload PDF or image files to automatically embed and index them for global retrieval.
         </p>
         
         <input 
           type="file" 
-          accept=".pdf" 
+          accept=".pdf,.png,.jpg,.jpeg,.webp" 
           ref={fileInputRef} 
           style={{ display: 'none' }} 
           onChange={handleFileUpload} 
@@ -136,7 +136,7 @@ export const KnowledgeBase: React.FC = () => {
             style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', background: 'var(--accent-primary)', color: 'white', border: 'none', borderRadius: '4px', cursor: isUploading ? 'not-allowed' : 'pointer' }}
           >
             {isUploading ? <Loader2 size={16} className="spin" /> : <Upload size={16} />}
-            {isUploading ? 'Uploading...' : '+ Add PDF'}
+            {isUploading ? 'Uploading...' : '+ Add File'}
           </button>
           
           {uploadStatus && (
@@ -162,7 +162,11 @@ export const KnowledgeBase: React.FC = () => {
           ) : (
             documents.map((doc, i) => (
               <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '1rem 0', borderBottom: '1px solid var(--border-color)' }}>
-                <FileText size={20} style={{ color: 'var(--accent-amber)', marginTop: '2px' }} />
+                {doc.document_name.toLowerCase().match(/\.(png|jpe?g|webp)$/) ? (
+                  <Image size={20} style={{ color: 'var(--accent-amber)', marginTop: '2px' }} />
+                ) : (
+                  <FileText size={20} style={{ color: 'var(--accent-amber)', marginTop: '2px' }} />
+                )}
                 <div>
                   <div style={{ fontWeight: 500, color: 'var(--text-primary)', marginBottom: '4px' }}>{doc.document_name}</div>
                   <div style={{ fontSize: '13px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '8px' }}>

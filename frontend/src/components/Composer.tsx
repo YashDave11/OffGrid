@@ -137,9 +137,23 @@ export const Composer: React.FC<ComposerProps> = ({
         {/* Attachment Preview Chip */}
         {(hasImage || hasDocument) && (
           <div className="composer-image-preview">
-            <div className="preview-thumb-card" style={hasDocument ? { display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-card-hover)', width: '60px', height: '60px', borderRadius: '6px' } : undefined}>
+            <div className="preview-thumb-card" style={hasDocument ? { 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              background: 'rgba(239, 68, 68, 0.08)', 
+              border: '1px solid rgba(239, 68, 68, 0.3)',
+              width: '54px', 
+              height: '54px', 
+              borderRadius: '8px' 
+            } : undefined}>
               {hasImage && <img src={base64Image!} alt="Upload preview" className="preview-img" />}
-              {hasDocument && <FileText size={24} color="var(--primary-color)" />}
+              {hasDocument && (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                  <FileText size={24} style={{ color: '#ef4444' }} />
+                  <span style={{ fontSize: '9px', fontWeight: 700, color: '#ef4444', letterSpacing: '0.05em', marginTop: '-2px' }}>PDF</span>
+                </div>
+              )}
               
               <button
                 type="button"
@@ -151,8 +165,12 @@ export const Composer: React.FC<ComposerProps> = ({
               </button>
             </div>
             <div className="preview-meta">
-              <span className="preview-tag">{hasImage ? 'Gemma Vision Input' : 'Document Input'}</span>
-              <span>{imageFileName || attachedDocument?.name || 'Attached File'}</span>
+              <span className="preview-tag" style={hasDocument ? { color: '#ef4444' } : undefined}>
+                {hasImage ? 'Gemma Vision Input' : 'PDF Document Attached'}
+              </span>
+              <span style={{ fontWeight: 500, color: 'var(--text-primary)', maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {imageFileName || attachedDocument?.name || 'Attached File'}
+              </span>
             </div>
           </div>
         )}

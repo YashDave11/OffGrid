@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Copy, Check, RotateCcw, AlertTriangle, Sparkles, User, FileText } from 'lucide-react';
+import { Copy, Check, RotateCcw, AlertTriangle, Sparkles, User, FileText, X } from 'lucide-react';
 import { ChatMessage } from '../types/workbench';
 import { MarkdownContent } from './MarkdownContent';
 import { ReasoningProcess } from './ReasoningProcess';
@@ -31,6 +31,18 @@ interface MessageItemProps {
 export const MessageItem: React.FC<MessageItemProps> = ({ message, onRetry }) => {
   const [copied, setCopied] = useState(false);
   const [imageModalOpen, setImageModalOpen] = useState(false);
+
+  // Close image modal on Escape key
+  React.useEffect(() => {
+    if (!imageModalOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setImageModalOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [imageModalOpen]);
 
   const isUser = message.role === 'user';
 
@@ -74,25 +86,32 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, onRetry }) =>
               alt="Uploaded input for Gemma Vision"
               className="message-attached-image"
               onClick={() => setImageModalOpen(true)}
-              title="Click to expand image"
+              title="Click to enlarge image"
             />
             {imageModalOpen && (
               <div
-                className="modal-backdrop"
+                className="modal-backdrop image-lightbox"
                 onClick={() => setImageModalOpen(false)}
-                style={{ padding: '40px' }}
               >
-                <img
-                  src={message.attachedImage}
-                  alt="Expanded view"
-                  style={{
-                    maxWidth: '90vw',
-                    maxHeight: '85vh',
-                    borderRadius: '8px',
-                    boxShadow: 'var(--shadow-lg)',
-                    objectFit: 'contain',
-                  }}
-                />
+                <div 
+                  className="lightbox-content"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <button
+                    type="button"
+                    className="lightbox-close-btn"
+                    onClick={() => setImageModalOpen(false)}
+                    aria-label="Close enlarged image"
+                    title="Close (Esc)"
+                  >
+                    <X size={20} />
+                  </button>
+                  <img
+                    src={message.attachedImage}
+                    alt="Enlarged view"
+                    className="lightbox-img"
+                  />
+                </div>
               </div>
             )}
           </div>
@@ -103,18 +122,34 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, onRetry }) =>
           <div className="message-attached-document" style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '10px',
-            padding: '12px',
-            background: 'var(--bg-card-hover)',
-            border: '1px solid var(--border-color)',
-            borderRadius: '6px',
+            gap: '12px',
+            padding: '10px 14px',
+            background: 'rgba(239, 68, 68, 0.06)',
+            border: '1px solid rgba(239, 68, 68, 0.25)',
+            borderRadius: '8px',
             marginBottom: '12px',
-            width: 'fit-content'
+            width: 'fit-content',
+            maxWidth: '100%'
           }}>
-            <FileText size={24} color="var(--primary-color)" />
+            <div style={{ 
+              display: 'flex', 
+              flexDirection: 'column', 
+              alignItems: 'center', 
+              justifyContent: 'center',
+              background: 'rgba(239, 68, 68, 0.12)',
+              borderRadius: '6px',
+              padding: '6px 8px'
+            }}>
+              <FileText size={22} style={{ color: '#ef4444' }} />
+              <span style={{ fontSize: '9px', fontWeight: 700, color: '#ef4444', letterSpacing: '0.05em', marginTop: '-2px' }}>PDF</span>
+            </div>
             <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <span style={{ fontWeight: 500, fontSize: '14px' }}>{message.attachedDocument.name}</span>
-              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>PDF Document</span>
+              <span style={{ fontWeight: 600, fontSize: '13.5px', color: 'var(--text-primary)', wordBreak: 'break-all' }}>
+                {message.attachedDocument.name}
+              </span>
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                PDF Document (Extracted & Indexed)
+              </span>
             </div>
           </div>
         )}
