@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Search, MessageSquare, Trash2, Edit2, PanelLeftClose, Check, Shield } from 'lucide-react';
+import { Plus, Search, MessageSquare, Trash2, Edit2, PanelLeftClose, Check, Shield, Library } from 'lucide-react';
 import { Conversation } from '../types/workbench';
 
 interface SidebarProps {
@@ -11,6 +11,7 @@ interface SidebarProps {
   onNewChat: () => void;
   onDeleteConversation: (id: string) => void;
   onRenameConversation: (id: string, newTitle: string) => void;
+  onOpenKnowledgeBase: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -22,6 +23,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onNewChat,
   onDeleteConversation,
   onRenameConversation,
+  onOpenKnowledgeBase,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -176,6 +178,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <span>New Chat</span>
             </div>
             <span className="kbd-hint">Ctrl+Shift+O</span>
+          </button>
+          
+          <button className="btn-new-chat" style={{ marginTop: '8px', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }} onClick={onOpenKnowledgeBase} type="button">
+            <div className="btn-left">
+              <Library size={15} />
+              <span>Knowledge Base</span>
+            </div>
           </button>
 
           <div className="sidebar-search">

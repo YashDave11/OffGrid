@@ -9,6 +9,8 @@ class AnalyzeRequest(BaseModel):
     task: str
     input_type: Literal["text", "image", "document"]
     content: str
+    document_name: Optional[str] = None
+    document_id: Optional[str] = None
 
 class AnalyzeResponse(BaseModel):
     request_id: str
@@ -17,3 +19,12 @@ class AnalyzeResponse(BaseModel):
     model: Optional[str]
     result: Optional[str]
     steps: List[str]
+    ingestion_details: Optional[dict] = None
+
+class KBSearchRequest(BaseModel):
+    query: str
+    top_k: int = 5
+
+class KBUploadRequest(BaseModel):
+    document_name: str
+    content: str  # Base64 encoded string

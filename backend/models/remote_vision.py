@@ -11,7 +11,7 @@ class RemoteVisionModel(ModelProvider):
     def name(self) -> str:
         return settings.vision_model_name
         
-    async def execute(self, task: str, content: str) -> str:
+    async def execute(self, task: str, content: str, **kwargs) -> str:
         endpoint = f"{settings.vision_base_url.rstrip('/')}/v1/chat/completions"
         
         payload = {

@@ -5,3 +5,6 @@ pydantic-settings
 python-dotenv
 pytest
 httpx
+PyMuPDF
+sentence-transformers
+faiss-cpu

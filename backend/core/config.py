@@ -20,6 +20,13 @@ class Settings(BaseSettings):
     
     model_connect_timeout: float = 2.0
     model_read_timeout: float = 120.0
+    
+    embedding_model: str = "BAAI/bge-small-en-v1.5"
+    embedding_device: str = "cpu"
+    
+    rag_top_k: int = 5
+    rag_max_context_chars: int = 16000
+    rag_similarity_threshold: float = 0.5
 
     model_config = SettingsConfigDict(
         env_file=".env",

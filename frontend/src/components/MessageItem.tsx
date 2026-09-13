@@ -1,8 +1,27 @@
 import React, { useState } from 'react';
-import { Copy, Check, RotateCcw, AlertTriangle, Sparkles, User } from 'lucide-react';
+import { Copy, Check, RotateCcw, AlertTriangle, Sparkles, User, FileText } from 'lucide-react';
 import { ChatMessage } from '../types/workbench';
 import { MarkdownContent } from './MarkdownContent';
 import { ReasoningProcess } from './ReasoningProcess';
+
+const SendingTimer: React.FC = () => {
+  const [elapsed, setElapsed] = React.useState(0);
+  
+  React.useEffect(() => {
+    const timer = setInterval(() => {
+      setElapsed(prev => prev + 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const mins = Math.floor(elapsed / 60);
+  const secs = elapsed % 60;
+  return (
+    <span style={{ fontSize: '13px', color: 'var(--text-muted)', marginLeft: '8px', fontFamily: 'monospace' }}>
+      [{mins.toString().padStart(2, '0')}:{secs.toString().padStart(2, '0')}]
+    </span>
+  );
+};
 
 interface MessageItemProps {
   message: ChatMessage;
@@ -79,6 +98,27 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, onRetry }) =>
           </div>
         )}
 
+        {/* Attached document if present */}
+        {message.attachedDocument && (
+          <div className="message-attached-document" style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            padding: '12px',
+            background: 'var(--bg-card-hover)',
+            border: '1px solid var(--border-color)',
+            borderRadius: '6px',
+            marginBottom: '12px',
+            width: 'fit-content'
+          }}>
+            <FileText size={24} color="var(--primary-color)" />
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <span style={{ fontWeight: 500, fontSize: '14px' }}>{message.attachedDocument.name}</span>
+              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>PDF Document</span>
+            </div>
+          </div>
+        )}
+
         {/* Reasoning process accordion */}
         {!isUser && message.reasoning && (
           <ReasoningProcess
@@ -94,6 +134,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, onRetry }) =>
             <span style={{ fontSize: '13px', fontStyle: 'italic' }}>
               Executing sovereign pipeline...
             </span>
+            <SendingTimer />
           </div>
         )}
 

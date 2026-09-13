@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 
 CAPABILITY_REASONING = "reasoning"
 CAPABILITY_VISION = "vision"
+CAPABILITY_DOCUMENT = "document"
 
 class ModelProvider(ABC):
     @property
@@ -17,6 +18,6 @@ class ModelProvider(ABC):
         pass
         
     @abstractmethod
-    async def execute(self, task: str, content: str) -> str:
+    async def execute(self, task: str, content: str, **kwargs) -> str:
         """Execute the model with the given task and content."""
         pass

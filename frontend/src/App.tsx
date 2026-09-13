@@ -9,6 +9,7 @@ import { Composer } from './components/Composer';
 import { CommandPalette } from './components/CommandPalette';
 import { KeyboardShortcutsModal } from './components/KeyboardShortcutsModal';
 import { StatusDetailsModal } from './components/StatusDetailsModal';
+import { KnowledgeBase } from './components/KnowledgeBase';
 import { ChatMessage, TaskType, AnalyzeResponsePayload } from './types/workbench';
 
 export const App: React.FC = () => {
@@ -37,6 +38,8 @@ export const App: React.FC = () => {
   const [shortcutsModalOpen, setShortcutsModalOpen] = useState(false);
   const [statusModalOpen, setStatusModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [activeDocumentId, setActiveDocumentId] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'chat' | 'knowledge'>('chat');
 
   // Apply theme to document
   useEffect(() => {
@@ -62,7 +65,7 @@ export const App: React.FC = () => {
   });
 
   // Handle Send Message
-  const handleSendMessage = async (text: string, base64Image?: string) => {
+  const handleSendMessage = async (text: string, base64Image?: string, attachedDocument?: { name: string, data: string }) => {
     if (isLoading) return;
 
     let convId = activeId;
@@ -77,6 +80,7 @@ export const App: React.FC = () => {
       role: 'user',
       content: text,
       attachedImage: base64Image,
+      attachedDocument: attachedDocument,
       timestamp: Date.now(),
       status: 'completed',
     };
@@ -96,8 +100,12 @@ export const App: React.FC = () => {
     addMessage(assistantMsg, convId);
     setIsLoading(true);
 
-    const inputType: TaskType = base64Image ? 'image' : 'text';
-    const content = base64Image || text;
+    const inputType: TaskType = attachedDocument ? 'document' : base64Image ? 'image' : 'text';
+    const content = attachedDocument ? attachedDocument.data : (base64Image || text);
+    
+    if (attachedDocument) {
+      setActiveDocumentId(null);
+    }
 
     try {
       const response = await fetch('/v1/analyze', {
@@ -109,6 +117,8 @@ export const App: React.FC = () => {
           task: text,
           input_type: inputType,
           content: content,
+          document_name: attachedDocument ? attachedDocument.name : undefined,
+          document_id: (!attachedDocument && activeDocumentId) ? activeDocumentId : undefined,
         }),
       });
 
@@ -127,6 +137,10 @@ export const App: React.FC = () => {
       if (thinkMatch) {
         reasoning = thinkMatch[1].trim();
         rawResult = rawResult.replace(thinkRegex, '').trim();
+      }
+      
+      if (data.ingestion_details?.document_id) {
+        setActiveDocumentId(data.ingestion_details.document_id);
       }
 
       updateMessage(
@@ -163,7 +177,7 @@ export const App: React.FC = () => {
     if (msgIdx <= 0) return;
     const prevUserMsg = activeConversation.messages[msgIdx - 1];
     if (prevUserMsg && prevUserMsg.role === 'user') {
-      handleSendMessage(prevUserMsg.content, prevUserMsg.attachedImage);
+      handleSendMessage(prevUserMsg.content, prevUserMsg.attachedImage, prevUserMsg.attachedDocument);
     }
   };
 
@@ -178,10 +192,20 @@ export const App: React.FC = () => {
         onClose={() => setSidebarOpen(false)}
         conversations={conversations}
         activeId={activeId}
-        onSelectConversation={(id) => setActiveId(id)}
-        onNewChat={() => createConversation()}
+        onSelectConversation={(id) => {
+          setActiveId(id);
+          setViewMode('chat');
+        }}
+        onNewChat={() => {
+          createConversation();
+          setViewMode('chat');
+        }}
         onDeleteConversation={(id) => deleteConversation(id)}
         onRenameConversation={(id, newTitle) => renameConversation(id, newTitle)}
+        onOpenKnowledgeBase={() => {
+          setViewMode('knowledge');
+          if (window.innerWidth <= 768) setSidebarOpen(false);
+        }}
       />
 
       {/* Main Chat Workspace */}
@@ -201,16 +225,22 @@ export const App: React.FC = () => {
           onToggleTheme={toggleTheme}
         />
 
-        <ChatArea
-          messages={currentMessages}
-          onSelectStarterPrompt={(prompt) => handleSendMessage(prompt)}
-          onRetryMessage={handleRetryMessage}
-        />
+        {viewMode === 'knowledge' ? (
+          <KnowledgeBase />
+        ) : (
+          <>
+            <ChatArea
+              messages={currentMessages}
+              onSelectStarterPrompt={(prompt) => handleSendMessage(prompt)}
+              onRetryMessage={handleRetryMessage}
+            />
 
-        <Composer
-          onSendMessage={handleSendMessage}
-          isLoading={isLoading}
-        />
+            <Composer
+              onSendMessage={handleSendMessage}
+              isLoading={isLoading}
+            />
+          </>
+        )}
       </main>
 
       {/* Modals */}

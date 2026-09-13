@@ -10,6 +10,7 @@ from backend.models.mock_reasoning import MockReasoningModel
 from backend.models.mock_vision import MockVisionModel
 from backend.models.remote_reasoning import RemoteReasoningModel
 from backend.models.remote_vision import RemoteVisionModel
+from backend.models.document_processor import DocumentProcessorModel
 
 # Setup logging
 setup_logging()
@@ -18,6 +19,7 @@ setup_logging()
 if settings.use_mock_providers:
     registry.register(MockReasoningModel())
     registry.register(MockVisionModel())
+    registry.register(DocumentProcessorModel())
 else:
     if settings.use_mock_reasoning:
         registry.register(MockReasoningModel())
@@ -28,6 +30,8 @@ else:
         registry.register(MockVisionModel())
     else:
         registry.register(RemoteVisionModel())
+        
+    registry.register(DocumentProcessorModel())
 
 app = FastAPI(
     title="MRPL Sovereign On-Premise Agentic AI Workbench",

@@ -11,7 +11,7 @@ class RemoteReasoningModel(ModelProvider):
     def name(self) -> str:
         return settings.reasoning_model_name
         
-    async def execute(self, task: str, content: str) -> str:
+    async def execute(self, task: str, content: str, **kwargs) -> str:
         endpoint = f"{settings.reasoning_base_url.rstrip('/')}/v1/chat/completions"
         
         user_msg = f"Task: {task}\nContent: {content}" if task and content and task.strip() != content.strip() else (task or content)

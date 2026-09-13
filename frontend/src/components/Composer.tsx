@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ImagePlus, Send, X, Eye, Cpu } from 'lucide-react';
+import { Send, X, Eye, Cpu, FileText, FilePlus } from 'lucide-react';
 
 interface ComposerProps {
-  onSendMessage: (text: string, base64Image?: string) => void;
+  onSendMessage: (text: string, base64Image?: string, attachedDocument?: { name: string, data: string }) => void;
   isLoading: boolean;
   disabled?: boolean;
 }
@@ -15,6 +15,7 @@ export const Composer: React.FC<ComposerProps> = ({
   const [text, setText] = useState('');
   const [base64Image, setBase64Image] = useState<string | null>(null);
   const [imageFileName, setImageFileName] = useState<string | null>(null);
+  const [attachedDocument, setAttachedDocument] = useState<{ name: string, data: string } | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -36,18 +37,27 @@ export const Composer: React.FC<ComposerProps> = ({
 
   // Handle File selection
   const handleFile = (file: File) => {
-    if (!file.type.startsWith('image/')) {
-      alert('Please select an image file (PNG, JPEG, WebP, etc.)');
-      return;
+    if (file.type === 'application/pdf') {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const res = e.target?.result as string;
+        setAttachedDocument({ name: file.name, data: res });
+        setBase64Image(null);
+        setImageFileName(null);
+      };
+      reader.readAsDataURL(file);
+    } else if (file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const res = e.target?.result as string;
+        setBase64Image(res);
+        setImageFileName(file.name);
+        setAttachedDocument(null);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      alert('Please select an image or PDF file.');
     }
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const res = e.target?.result as string;
-      setBase64Image(res);
-      setImageFileName(file.name);
-    };
-    reader.readAsDataURL(file);
   };
 
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -57,9 +67,10 @@ export const Composer: React.FC<ComposerProps> = ({
     }
   };
 
-  const clearImage = () => {
+  const clearAttachment = () => {
     setBase64Image(null);
     setImageFileName(null);
+    setAttachedDocument(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -68,13 +79,17 @@ export const Composer: React.FC<ComposerProps> = ({
   // Handle Submit
   const handleSend = () => {
     const trimmed = text.trim();
-    if ((!trimmed && !base64Image) || isLoading || disabled) {
+    if ((!trimmed && !base64Image && !attachedDocument) || isLoading || disabled) {
       return;
     }
 
-    onSendMessage(trimmed || 'Analyze this image', base64Image || undefined);
+    let defaultText = 'Analyze this input';
+    if (base64Image) defaultText = 'Analyze this image';
+    if (attachedDocument) defaultText = 'Extract text from this document';
+
+    onSendMessage(trimmed || defaultText, base64Image || undefined, attachedDocument || undefined);
     setText('');
-    clearImage();
+    clearAttachment();
   };
 
   // Handle Key Down (Enter to send, Shift+Enter for newline)
@@ -101,7 +116,7 @@ export const Composer: React.FC<ComposerProps> = ({
   const handlePaste = (e: React.ClipboardEvent) => {
     if (e.clipboardData && e.clipboardData.files.length > 0) {
       const file = e.clipboardData.files[0];
-      if (file.type.startsWith('image/')) {
+      if (file.type.startsWith('image/') || file.type === 'application/pdf') {
         e.preventDefault();
         handleFile(file);
       }
@@ -109,7 +124,8 @@ export const Composer: React.FC<ComposerProps> = ({
   };
 
   const hasImage = Boolean(base64Image);
-  const canSend = (text.trim().length > 0 || hasImage) && !isLoading && !disabled;
+  const hasDocument = Boolean(attachedDocument);
+  const canSend = (text.trim().length > 0 || hasImage || hasDocument) && !isLoading && !disabled;
 
   return (
     <div className="composer-dock">
@@ -118,23 +134,25 @@ export const Composer: React.FC<ComposerProps> = ({
         onDragOver={handleDragOver}
         onDrop={handleDrop}
       >
-        {/* Image Preview Chip if attached */}
-        {hasImage && (
+        {/* Attachment Preview Chip */}
+        {(hasImage || hasDocument) && (
           <div className="composer-image-preview">
-            <div className="preview-thumb-card">
-              <img src={base64Image!} alt="Upload preview" className="preview-img" />
+            <div className="preview-thumb-card" style={hasDocument ? { display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-card-hover)', width: '60px', height: '60px', borderRadius: '6px' } : undefined}>
+              {hasImage && <img src={base64Image!} alt="Upload preview" className="preview-img" />}
+              {hasDocument && <FileText size={24} color="var(--primary-color)" />}
+              
               <button
                 type="button"
                 className="btn-remove-preview"
-                onClick={clearImage}
-                title="Remove attached image"
+                onClick={clearAttachment}
+                title="Remove attached file"
               >
                 <X size={12} />
               </button>
             </div>
             <div className="preview-meta">
-              <span className="preview-tag">Gemma Vision Input</span>
-              <span>{imageFileName || 'Pasted Image'}</span>
+              <span className="preview-tag">{hasImage ? 'Gemma Vision Input' : 'Document Input'}</span>
+              <span>{imageFileName || attachedDocument?.name || 'Attached File'}</span>
             </div>
           </div>
         )}
@@ -150,7 +168,9 @@ export const Composer: React.FC<ComposerProps> = ({
           placeholder={
             hasImage
               ? 'Add an instruction for Gemma Vision model, or press Enter...'
-              : 'Ask MRPL Sovereign AI or give instructions (Enter to send, Shift+Enter for newline)...'
+              : hasDocument 
+              ? 'Add instructions for document processing...'
+              : 'Ask MRPL Sovereign AI or attach files (Enter to send, Shift+Enter for newline)...'
           }
           rows={1}
           disabled={disabled || isLoading}
@@ -163,7 +183,7 @@ export const Composer: React.FC<ComposerProps> = ({
               type="file"
               ref={fileInputRef}
               onChange={handleFileInputChange}
-              accept="image/*"
+              accept="image/*, application/pdf"
               style={{ display: 'none' }}
               id="composer-file-input"
             />
@@ -171,19 +191,24 @@ export const Composer: React.FC<ComposerProps> = ({
               type="button"
               className="btn-composer-attach"
               onClick={() => fileInputRef.current?.click()}
-              title="Attach image for Gemma Vision"
+              title="Attach image or PDF"
               disabled={isLoading || disabled}
             >
-              <ImagePlus size={15} />
-              <span>Attach Image</span>
+              <FilePlus size={15} />
+              <span>Attach File</span>
             </button>
 
             {/* Model Capability Badge */}
-            <div className={`capability-pill ${hasImage ? 'vision' : 'reasoning'}`}>
+            <div className={`capability-pill ${hasImage ? 'vision' : hasDocument ? 'document' : 'reasoning'}`}>
               {hasImage ? (
                 <>
                   <Eye size={12} />
                   <span>Vision // Gemma-3-4B</span>
+                </>
+              ) : hasDocument ? (
+                <>
+                  <FileText size={12} />
+                  <span>Document // PyMuPDF</span>
                 </>
               ) : (
                 <>

@@ -35,3 +35,6 @@ benchmarks/
 # OS
 .DS_Store
 Thumbs.db
+
+# Generated RAG / Vector data & temp files
+data/

@@ -10,7 +10,7 @@ class MockReasoningModel(ModelProvider):
     def name(self) -> str:
         return "mock-reasoning"
         
-    async def execute(self, task: str, content: str) -> str:
+    async def execute(self, task: str, content: str, **kwargs) -> str:
         # Ultra-fast non-blocking simulation (50ms)
         await asyncio.sleep(0.05)
         

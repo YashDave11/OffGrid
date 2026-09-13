@@ -14,6 +14,7 @@ export interface ChatMessage {
   content: string;
   timestamp: number;
   attachedImage?: string; // base64 data URL
+  attachedDocument?: { name: string; data: string }; // base64 document with name
   model?: string;
   taskType?: TaskType;
   steps?: string[];
@@ -34,6 +35,8 @@ export interface AnalyzeRequestPayload {
   task: string;
   input_type: TaskType;
   content: string;
+  document_name?: string;
+  document_id?: string;
 }
 
 export interface AnalyzeResponsePayload {
@@ -43,6 +46,7 @@ export interface AnalyzeResponsePayload {
   model: string;
   result: string;
   steps: string[];
+  ingestion_details?: any;
 }
 
 export interface CommandItem {
