@@ -14,7 +14,7 @@ class MockReasoningModel(ModelProvider):
         # Ultra-fast non-blocking simulation (50ms)
         await asyncio.sleep(0.05)
         
-        return f"""<think>
+        result_text = f"""<think>
 1. Deconstruct incoming instruction: "{task}"
 2. Retrieve MRPL refinery operational tolerances, thermodynamic balances, and safety envelopes.
 3. Formulate stoichiometric heat-duty calculations and verify HazOp safety constraints.
@@ -59,3 +59,16 @@ print(f"Safety Verification: {{metrics['status']}} (Temp Margin: +{{metrics['tem
 
 > **Operational Directive**: Maintain current reflux ratio of 2.4. Continue normal continuous process monitoring under DCS supervision.
 """
+        
+        metrics = {
+            "usage": {
+                "prompt_tokens": len(content) // 4,
+                "completion_tokens": 150,
+                "total_tokens": (len(content) // 4) + 150
+            },
+            "timings": {
+                "predicted_per_second": 45.5
+            }
+        }
+        
+        return result_text, metrics

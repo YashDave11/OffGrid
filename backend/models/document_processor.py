@@ -5,11 +5,13 @@ import os
 import json
 import uuid
 import faiss
+import hashlib
 import pymupdf as fitz
 from rapidocr_onnxruntime import RapidOCR
 from backend.models.base import ModelProvider, CAPABILITY_DOCUMENT
 from backend.documents.embedder import EmbeddingService
 from backend.documents.knowledge_base import KnowledgeBaseService
+from backend.models.registry import registry
 
 class DocumentProcessorModel(ModelProvider):
     def __init__(self):
@@ -225,6 +227,119 @@ class DocumentProcessorModel(ModelProvider):
         finally:
             doc.close()
 
+    async def _process_image(self, b64_data: str, document_name: str, add_to_kb: bool = False) -> tuple[str, dict]:
+        t0 = time.time()
+        
+        img_bytes = base64.b64decode(b64_data)
+        document_id = hashlib.sha256(img_bytes).hexdigest()
+        safe_doc_name = document_name if document_name else "unnamed_image.png"
+        
+        vision_provider = registry.get_provider("vision")
+        if not vision_provider:
+            return "Vision provider unavailable for image extraction.", {}
+            
+        ext = safe_doc_name.lower().split('.')[-1]
+        mime_type = "image/jpeg" if ext in ["jpg", "jpeg"] else f"image/{ext}"
+        data_url = f"data:{mime_type};base64,{b64_data}"
+        
+        t1 = time.time()
+        prompt = "Describe this image in extreme detail, extracting all text, structure, context, and visual information so it can be indexed in a text-based knowledge base. Be comprehensive."
+        description = await vision_provider.execute(task=prompt, content=data_url)
+        
+        if not description or not description.strip():
+            return "Failed to extract text description from image.", {}
+            
+        extraction_ms = int((time.time() - t1) * 1000)
+        
+        t2 = time.time()
+        extracted_chunks = [{"text": description.strip(), "page": None, "source_type": "image"}]
+        embeddings = self.embedder.embed([description.strip()])
+        embedding_ms = int((time.time() - t2) * 1000)
+        
+        t3 = time.time()
+        dimension = self.embedder.dimension
+        index = faiss.IndexFlatIP(dimension)
+        index.add(embeddings)
+        
+        metadata = [{
+            "chunk_id": f"{document_id}_c0000",
+            "document": safe_doc_name,
+            "page": None,
+            "text": description.strip(),
+            "source_type": "image"
+        }]
+        
+        os.makedirs("data/rag/indexes", exist_ok=True)
+        os.makedirs("data/rag/metadata", exist_ok=True)
+        
+        faiss.write_index(index, f"data/rag/indexes/{document_id}.faiss")
+        with open(f"data/rag/metadata/{document_id}.json", "w") as f:
+            json.dump(metadata, f, indent=2)
+            
+        indexing_ms = int((time.time() - t3) * 1000)
+        
+        kb_status = "skipped"
+        if add_to_kb:
+            kb_service = KnowledgeBaseService.get_instance()
+            if kb_service.add_document(document_id, safe_doc_name, extracted_chunks, embeddings):
+                kb_status = "added"
+            else:
+                kb_status = "duplicate"
+                
+        t_total = int((time.time() - t0) * 1000)
+        
+        ingestion_details = {
+            "document_id": document_id,
+            "document": safe_doc_name,
+            "page_count": 1,
+            "chunk_count": 1,
+            "embedding": {
+                "model": self.embedder.model_name,
+                "dimension": dimension,
+                "device": self.embedder.device
+            },
+            "index": {
+                "type": "faiss",
+                "status": "created",
+                "location": f"data/rag/indexes/{document_id}.faiss"
+            },
+            "timing": {
+                "extraction_ms": extraction_ms,
+                "chunking_ms": 0,
+                "embedding_ms": embedding_ms,
+                "indexing_ms": indexing_ms,
+                "total_ms": t_total
+            },
+            "knowledge_base": kb_status
+        }
+        
+        response = [
+            f"✅ **Successfully ingested `{safe_doc_name}` into local vector store.**",
+            f"- Extracted 1 semantic chunk from image using Vision Model.",
+            f"- Embedded 1 chunk using `{self.embedder.model_name}` on `{self.embedder.device}`.",
+            f"- Indexed into FAISS FlatIP (ID: `{document_id[:8]}...`)",
+        ]
+        
+        if kb_status == "added":
+            response.append(f"- **Also added to Persistent Knowledge Base**")
+        elif kb_status == "duplicate":
+            response.append(f"- **Document already exists in Knowledge Base (Duplicate ignored)**")
+            
+        response.extend([
+            "",
+            "### Ingestion Details",
+            "```json",
+            json.dumps(ingestion_details, indent=2),
+            "```",
+            "",
+            "### Semantic Extraction",
+            "```text",
+            description[:500] + ("..." if len(description) > 500 else ""),
+            "```"
+        ])
+        
+        return "\n".join(response), ingestion_details
+
     async def execute(self, task: str, content: str, **kwargs) -> tuple[str, dict]:
         try:
             document_name = kwargs.get("document_name", "unknown_document.pdf")
@@ -233,6 +348,9 @@ class DocumentProcessorModel(ModelProvider):
                 _, b64_data = content.split(",", 1)
             else:
                 b64_data = content
+
+            if document_name.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')):
+                return await self._process_image(b64_data, document_name, add_to_kb)
                 
             return await asyncio.to_thread(self._process_pdf_sync, b64_data, document_name, add_to_kb)
         except Exception as e:

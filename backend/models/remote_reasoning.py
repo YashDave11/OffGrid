@@ -46,8 +46,16 @@ class RemoteReasoningModel(ModelProvider):
                 reasoning_text = message.get("reasoning_content") or ""
 
                 if reasoning_text and "<think>" not in content_text:
-                    return f"<think>\n{reasoning_text}\n</think>\n\n{content_text}".strip()
-                return (content_text or reasoning_text).strip()
+                    result_text = f"<think>\n{reasoning_text}\n</think>\n\n{content_text}".strip()
+                else:
+                    result_text = (content_text or reasoning_text).strip()
+                
+                metrics = {
+                    "usage": data.get("usage", {}),
+                    "timings": data.get("timings", {})
+                }
+                
+                return result_text, metrics
                 
         except httpx.ConnectError as e:
             raise RuntimeError(f"Remote reasoning provider ({settings.reasoning_model_name}) unavailable: Connection failed.") from e

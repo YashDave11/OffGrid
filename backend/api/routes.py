@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends
-from backend.api.schemas import HealthResponse, AnalyzeRequest, AnalyzeResponse, KBSearchRequest, KBUploadRequest
+from backend.api.schemas import HealthResponse, AnalyzeRequest, AnalyzeResponse, KBSearchRequest, KBUploadRequest, DiagramRequest
 from backend.orchestrator.agent import Orchestrator
 from backend.orchestrator.state import AgentState
 from backend.models.registry import registry
@@ -32,10 +32,12 @@ async def status_check():
             
     reasoning_res = "standby" if (settings.use_mock_providers or settings.use_mock_reasoning) else await check_provider(settings.reasoning_base_url)
     vision_res = "standby" if (settings.use_mock_providers or settings.use_mock_vision) else await check_provider(settings.vision_base_url)
+    diagram_res = "standby" if settings.use_mock_providers else await check_provider(settings.diagram_base_url)
             
     return {
         "reasoning": reasoning_res,
         "vision": vision_res,
+        "diagram": diagram_res,
         "mode": "mock" if settings.use_mock_providers else "remote"
     }
 
@@ -72,7 +74,8 @@ async def analyze(request: AnalyzeRequest, orchestrator: Orchestrator = Depends(
         task=request.task,
         input_type=request.input_type,
         content=request.content,
-        document_name=request.document_name
+        document_name=request.document_name,
+        conversation_id=request.conversation_id
     )
     
     if context.state == AgentState.FAILED:
@@ -130,3 +133,63 @@ async def delete_kb_document(document_id: str):
     if kb.delete_document(document_id):
         return {"status": "success", "message": "Document deleted"}
     raise HTTPException(status_code=404, detail="Document not found")
+
+@router.post("/v1/diagram/generate")
+async def generate_diagram(request: DiagramRequest):
+    """Generate a diagram via remote service."""
+    import uuid
+    from fastapi import Response
+    
+    import re
+    
+    def sanitize_text(text: str) -> str:
+        if not text:
+            return ""
+        # Remove characters that might break naive JSON parsers (quotes, slashes, brackets)
+        text = re.sub(r'["\'\\/\[\]{}<>]', ' ', text)
+        # Replace newlines with spaces to avoid raw newline issues
+        text = text.replace('\n', ' ').replace('\r', ' ')
+        # Collapse multiple spaces
+        text = re.sub(r'\s+', ' ', text)
+        return text.strip()
+
+    # Compile conversation history for context
+    history_context = ""
+    conv_ctx = None
+    if request.conversation_id:
+        from backend.orchestrator.state import get_conversation, Observation
+        conv_ctx = get_conversation(request.conversation_id)
+        if conv_ctx:
+            # We add the diagram request as a user message
+            conv_ctx.add_observation(Observation(source="user", type="message", content=f"Generate diagram: {request.topic}"))
+            # Fetch last few messages for context
+            for obs in conv_ctx.observations[-10:-1]:
+                history_context += f"{obs.source}: {sanitize_text(obs.content)} | "
+    
+    safe_topic = sanitize_text(request.topic)
+    safe_context = f"{sanitize_text(request.context)} Recent History: {history_context}".strip()
+    
+    payload = {
+        "request_id": request.request_id or str(uuid.uuid4()),
+        "topic": safe_topic,
+        "context": safe_context,
+        "output_format": "png"
+    }
+    
+    try:
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            res = await client.post(f"{settings.diagram_base_url.rstrip('/')}/v1/generate", json=payload)
+            res.raise_for_status()
+            
+            # Record diagram generation in conversation context
+            if conv_ctx:
+                from backend.orchestrator.state import Observation
+                conv_ctx.add_observation(Observation(source="mihil", type="diagram", content="[Diagram Generated]"))
+                
+            return Response(content=res.content, media_type="image/png")
+    except httpx.RequestError as e:
+        raise HTTPException(status_code=503, detail=f"Diagram service unreachable: {str(e)}")
+    except httpx.HTTPStatusError as e:
+        raise HTTPException(status_code=e.response.status_code, detail=f"Diagram service returned error: {e.response.text}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Internal diagram error: {str(e)}")

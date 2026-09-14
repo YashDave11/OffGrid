@@ -65,7 +65,7 @@ export const App: React.FC = () => {
   });
 
   // Handle Send Message
-  const handleSendMessage = async (text: string, base64Image?: string, attachedDocument?: { name: string, data: string }) => {
+  const handleSendMessage = async (text: string, base64Image?: string, attachedDocument?: { name: string, data: string }, isDiagramMode?: boolean) => {
     if (isLoading) return;
 
     let convId = activeId;
@@ -106,6 +106,45 @@ export const App: React.FC = () => {
     if (attachedDocument) {
       setActiveDocumentId(null);
     }
+    
+    if (isDiagramMode) {
+      try {
+        const response = await fetch('/v1/diagram/generate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            topic: text,
+            conversation_id: convId,
+          }),
+        });
+
+        if (!response.ok) {
+          const errData = await response.json().catch(() => null);
+          throw new Error(errData?.detail || 'Diagram service unavailable or failed');
+        }
+
+        const blob = await response.blob();
+        const objectUrl = URL.createObjectURL(blob);
+
+        updateMessage(assistantMessageId, {
+          status: 'completed',
+          model: 'Mihil Diagram API',
+          content: '',
+          attachedImage: objectUrl,
+        }, convId);
+      } catch (err: any) {
+        console.error('Diagram Error:', err);
+        updateMessage(assistantMessageId, {
+          status: 'error',
+          error: err.message || 'Diagram service offline.',
+        }, convId);
+      } finally {
+        setIsLoading(false);
+      }
+      return;
+    }
 
     try {
       const response = await fetch('/v1/analyze', {
@@ -119,6 +158,7 @@ export const App: React.FC = () => {
           content: content,
           document_name: attachedDocument ? attachedDocument.name : undefined,
           document_id: (!attachedDocument && activeDocumentId) ? activeDocumentId : undefined,
+          conversation_id: convId,
         }),
       });
 
@@ -142,6 +182,14 @@ export const App: React.FC = () => {
       if (data.ingestion_details?.document_id) {
         setActiveDocumentId(data.ingestion_details.document_id);
       }
+      
+      let metrics;
+      if (data.ingestion_details && data.ingestion_details.usage) {
+        metrics = {
+          totalTokens: data.ingestion_details.usage.total_tokens || 0,
+          tokensPerSecond: data.ingestion_details.timings?.predicted_per_second || 0
+        };
+      }
 
       updateMessage(
         assistantMessageId,
@@ -152,6 +200,7 @@ export const App: React.FC = () => {
           model: data.model,
           taskType: data.task_type as TaskType,
           steps: data.steps,
+          metrics: metrics,
         },
         convId
       );

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Copy, Check, RotateCcw, AlertTriangle, Sparkles, User, FileText, X } from 'lucide-react';
+import { Copy, Check, RotateCcw, AlertTriangle, Sparkles, User, FileText, X, Zap, Database } from 'lucide-react';
 import { ChatMessage } from '../types/workbench';
 import { MarkdownContent } from './MarkdownContent';
 import { ReasoningProcess } from './ReasoningProcess';
@@ -83,7 +83,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, onRetry }) =>
           <div>
             <img
               src={message.attachedImage}
-              alt="Uploaded input for Gemma Vision"
+              alt={isUser ? "Uploaded input for Gemma Vision" : "Generated Diagram"}
               className="message-attached-image"
               onClick={() => setImageModalOpen(true)}
               title="Click to enlarge image"
@@ -238,6 +238,50 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, onRetry }) =>
                 </>
               )}
             </button>
+          </div>
+        )}
+        
+        {/* Metrics UI */}
+        {message.metrics && (
+          <div style={{
+            display: 'flex',
+            gap: '12px',
+            marginTop: '12px',
+            paddingTop: '12px',
+            borderTop: '1px solid rgba(255, 255, 255, 0.05)',
+            alignItems: 'center'
+          }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              background: 'rgba(59, 130, 246, 0.1)',
+              padding: '4px 8px',
+              borderRadius: '6px',
+              border: '1px solid rgba(59, 130, 246, 0.2)',
+              color: 'rgba(147, 197, 253, 0.9)',
+              fontSize: '11.5px',
+              fontFamily: 'monospace'
+            }}>
+              <Zap size={13} style={{ color: '#60a5fa' }} />
+              <span>{message.metrics.tokensPerSecond.toFixed(1)} t/s</span>
+            </div>
+            
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              background: 'rgba(168, 85, 247, 0.1)',
+              padding: '4px 8px',
+              borderRadius: '6px',
+              border: '1px solid rgba(168, 85, 247, 0.2)',
+              color: 'rgba(216, 180, 254, 0.9)',
+              fontSize: '11.5px',
+              fontFamily: 'monospace'
+            }}>
+              <Database size={13} style={{ color: '#c084fc' }} />
+              <span>{message.metrics.totalTokens} tokens</span>
+            </div>
           </div>
         )}
       </div>

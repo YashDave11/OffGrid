@@ -21,6 +21,10 @@ export interface ChatMessage {
   reasoning?: string; // parsed <think> block
   status?: 'sending' | 'completed' | 'error';
   error?: string;
+  metrics?: {
+    totalTokens: number;
+    tokensPerSecond: number;
+  };
 }
 
 export interface Conversation {
@@ -37,6 +41,7 @@ export interface AnalyzeRequestPayload {
   content: string;
   document_name?: string;
   document_id?: string;
+  conversation_id?: string;
 }
 
 export interface AnalyzeResponsePayload {

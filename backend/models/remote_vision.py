@@ -40,7 +40,13 @@ class RemoteVisionModel(ModelProvider):
                 response = await client.post(endpoint, json=payload)
                 response.raise_for_status()
                 data = response.json()
-                return data["choices"][0]["message"]["content"]
+                
+                metrics = {
+                    "usage": data.get("usage", {}),
+                    "timings": data.get("timings", {})
+                }
+                
+                return data["choices"][0]["message"]["content"], metrics
                 
         except httpx.ConnectError as e:
             raise RuntimeError(f"Remote vision provider ({settings.vision_model_name}) unavailable: Connection failed.") from e

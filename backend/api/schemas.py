@@ -11,6 +11,13 @@ class AnalyzeRequest(BaseModel):
     content: str
     document_name: Optional[str] = None
     document_id: Optional[str] = None
+    conversation_id: Optional[str] = None
+
+class DiagramRequest(BaseModel):
+    request_id: Optional[str] = None
+    topic: str
+    context: Optional[str] = ""
+    conversation_id: Optional[str] = None
 
 class AnalyzeResponse(BaseModel):
     request_id: str

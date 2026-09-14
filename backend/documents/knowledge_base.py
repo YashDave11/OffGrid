@@ -92,7 +92,7 @@ class KnowledgeBaseService:
                 "document": document_name,
                 "page": chunk.get("page", 1), # Could be improved if chunker preserves page
                 "text": chunk["text"],
-                "source_type": "pdf"
+                "source_type": chunk.get("source_type", "pdf")
             })
             
         with open(self.meta_path, "w", encoding="utf-8") as f:

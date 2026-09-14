@@ -17,7 +17,7 @@ class MockVisionModel(ModelProvider):
         is_data_url = content.startswith("data:image")
         img_info = "Base64 Image Telemetry" if is_data_url else "Visual Buffer"
         
-        return f"""[MOCK VISION OUTPUT] Sovereign Visual Inspection Analysis (Gemma-3-4B-IT Local Standby Engine)
+        result_text = f"""[MOCK VISION OUTPUT] Sovereign Visual Inspection Analysis (Gemma-3-4B-IT Local Standby Engine)
 
 ### Visual Telemetry & Geometry Assessment
 - **Input Stream**: {img_info} ({len(content)} bytes)
@@ -38,3 +38,16 @@ class MockVisionModel(ModelProvider):
 
 > **Operational Verdict**: Inspection target meets all refinery process safety criteria. Unit is cleared for uninterrupted operational duty.
 """
+        
+        metrics = {
+            "usage": {
+                "prompt_tokens": len(content) // 10,
+                "completion_tokens": 85,
+                "total_tokens": (len(content) // 10) + 85
+            },
+            "timings": {
+                "predicted_per_second": 32.1
+            }
+        }
+        
+        return result_text, metrics

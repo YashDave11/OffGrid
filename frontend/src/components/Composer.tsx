@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, X, Eye, Cpu, FileText, FilePlus } from 'lucide-react';
+import { Send, X, Eye, Cpu, FileText, FilePlus, Sparkles } from 'lucide-react';
 
 interface ComposerProps {
-  onSendMessage: (text: string, base64Image?: string, attachedDocument?: { name: string, data: string }) => void;
+  onSendMessage: (text: string, base64Image?: string, attachedDocument?: { name: string, data: string }, isDiagramMode?: boolean) => void;
   isLoading: boolean;
   disabled?: boolean;
 }
@@ -16,6 +16,7 @@ export const Composer: React.FC<ComposerProps> = ({
   const [base64Image, setBase64Image] = useState<string | null>(null);
   const [imageFileName, setImageFileName] = useState<string | null>(null);
   const [attachedDocument, setAttachedDocument] = useState<{ name: string, data: string } | null>(null);
+  const [isDiagramMode, setIsDiagramMode] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -86,8 +87,9 @@ export const Composer: React.FC<ComposerProps> = ({
     let defaultText = 'Analyze this input';
     if (base64Image) defaultText = 'Analyze this image';
     if (attachedDocument) defaultText = 'Extract text from this document';
+    if (isDiagramMode) defaultText = 'Generate a diagram';
 
-    onSendMessage(trimmed || defaultText, base64Image || undefined, attachedDocument || undefined);
+    onSendMessage(trimmed || defaultText, base64Image || undefined, attachedDocument || undefined, isDiagramMode);
     setText('');
     clearAttachment();
   };
@@ -214,6 +216,23 @@ export const Composer: React.FC<ComposerProps> = ({
             >
               <FilePlus size={15} />
               <span>Attach File</span>
+            </button>
+
+            <button
+              type="button"
+              className={`btn-composer-attach ${isDiagramMode ? 'active-diagram' : ''}`}
+              onClick={() => setIsDiagramMode(!isDiagramMode)}
+              title="Toggle Diagram Generation Mode"
+              disabled={isLoading || disabled}
+              style={{
+                marginLeft: '8px',
+                background: isDiagramMode ? 'rgba(59, 130, 246, 0.15)' : 'transparent',
+                color: isDiagramMode ? '#3b82f6' : 'inherit',
+                border: isDiagramMode ? '1px solid rgba(59, 130, 246, 0.3)' : '1px solid transparent',
+              }}
+            >
+              <Sparkles size={15} />
+              <span>Diagram Mode</span>
             </button>
 
             {/* Model Capability Badge */}
