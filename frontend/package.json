@@ -10,14 +10,22 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@internationalized/date": "^3.12.4",
+    "@remixicon/react": "^4.9.0",
+    "@tailwindcss/vite": "^4.3.3",
     "lucide-react": "^1.45.0",
+    "motion": "^13.3.0",
     "prismjs": "^1.29.0",
     "react": "^18.3.1",
+    "react-aria-components": "^1.21.1",
     "react-dom": "^18.3.1",
     "react-markdown": "^9.0.3",
-    "remark-gfm": "^4.0.1"
+    "remark-gfm": "^4.0.1",
+    "tailwind-merge": "^3.7.0",
+    "tailwindcss": "^4.3.3"
   },
   "devDependencies": {
+    "@types/node": "^26.5.1",
     "@types/prismjs": "^1.26.5",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",

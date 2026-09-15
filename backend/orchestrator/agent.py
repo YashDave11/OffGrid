@@ -187,6 +187,8 @@ class Orchestrator:
             exec_res = await provider.execute(task, content, **kwargs)
             if isinstance(exec_res, tuple):
                 result, details = exec_res
+                if isinstance(details, dict) and "model_used" in details:
+                    context.model_used = details["model_used"]
                 if context.ingestion_details:
                     # Update existing details (like RAG retrieval) if present
                     context.ingestion_details.update(details)

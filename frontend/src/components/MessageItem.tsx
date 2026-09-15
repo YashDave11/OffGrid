@@ -1,15 +1,27 @@
 import React, { useState } from 'react';
-import { Copy, Check, RotateCcw, AlertTriangle, Sparkles, User, FileText, X, Zap, Database } from 'lucide-react';
+import {
+  RiFileCopyLine,
+  RiCheckLine,
+  RiRestartLine,
+  RiAlertLine,
+  RiSparklingLine,
+  RiFilePdfLine,
+  RiSpeedUpLine,
+  RiDatabase2Line,
+  RiZoomInLine,
+} from '@remixicon/react';
 import { ChatMessage } from '../types/workbench';
 import { MarkdownContent } from './MarkdownContent';
 import { ReasoningProcess } from './ReasoningProcess';
+import { ImageLightboxModal } from './ImageLightboxModal';
+import { cx } from '@/utils/cx';
 
 const SendingTimer: React.FC = () => {
-  const [elapsed, setElapsed] = React.useState(0);
-  
+  const [elapsed, setElapsed] = useState(0);
+
   React.useEffect(() => {
     const timer = setInterval(() => {
-      setElapsed(prev => prev + 1);
+      setElapsed((prev) => prev + 1);
     }, 1000);
     return () => clearInterval(timer);
   }, []);
@@ -17,7 +29,7 @@ const SendingTimer: React.FC = () => {
   const mins = Math.floor(elapsed / 60);
   const secs = elapsed % 60;
   return (
-    <span style={{ fontSize: '13px', color: 'var(--text-muted)', marginLeft: '8px', fontFamily: 'monospace' }}>
+    <span className="font-mono text-caption-1-medium text-text-tertiary">
       [{mins.toString().padStart(2, '0')}:{secs.toString().padStart(2, '0')}]
     </span>
   );
@@ -26,19 +38,17 @@ const SendingTimer: React.FC = () => {
 interface MessageItemProps {
   message: ChatMessage;
   onRetry?: () => void;
+  onCitationClick?: (docName: string, page?: string) => void;
 }
 
-export const MessageItem: React.FC<MessageItemProps> = ({ message, onRetry }) => {
+export const MessageItem: React.FC<MessageItemProps> = ({ message, onRetry, onCitationClick }) => {
   const [copied, setCopied] = useState(false);
   const [imageModalOpen, setImageModalOpen] = useState(false);
 
-  // Close image modal on Escape key
   React.useEffect(() => {
     if (!imageModalOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setImageModalOpen(false);
-      }
+      if (e.key === 'Escape') setImageModalOpen(false);
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
@@ -63,226 +73,203 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, onRetry }) =>
     return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
-  return (
-    <div className={`message-row ${isUser ? 'user' : 'assistant'}`}>
-      <div className="message-avatar">
-        {isUser ? <User size={16} /> : <Sparkles size={16} />}
-      </div>
-
-      <div className="message-body-wrap">
-        <div className="message-meta">
-          <span className="message-author">{isUser ? 'You' : 'MRPL Sovereign AI'}</span>
-          <span className="message-time">{formatTime(message.timestamp)}</span>
-          {!isUser && message.model && (
-            <span className="model-chip">{message.model}</span>
-          )}
+  if (isUser) {
+    return (
+      <div className="flex flex-col items-end gap-1.5 my-3 w-full animate-fadeIn">
+        <div className="flex items-center gap-2 text-caption-1-medium text-text-tertiary mr-1">
+          <span>You</span>
+          <span>•</span>
+          <span>{formatTime(message.timestamp)}</span>
         </div>
 
         {/* Attached image if present */}
         {message.attachedImage && (
-          <div>
-            <img
-              src={message.attachedImage}
-              alt={isUser ? "Uploaded input for Gemma Vision" : "Generated Diagram"}
-              className="message-attached-image"
+          <div className="relative group/img inline-block max-w-sm mb-1">
+            <div
               onClick={() => setImageModalOpen(true)}
-              title="Click to enlarge image"
-            />
-            {imageModalOpen && (
-              <div
-                className="modal-backdrop image-lightbox"
-                onClick={() => setImageModalOpen(false)}
-              >
-                <div 
-                  className="lightbox-content"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <button
-                    type="button"
-                    className="lightbox-close-btn"
-                    onClick={() => setImageModalOpen(false)}
-                    aria-label="Close enlarged image"
-                    title="Close (Esc)"
-                  >
-                    <X size={20} />
-                  </button>
-                  <img
-                    src={message.attachedImage}
-                    alt="Enlarged view"
-                    className="lightbox-img"
-                  />
-                </div>
+              className="relative overflow-hidden rounded-2xl border border-border-button-default bg-background-secondary-default cursor-pointer hover:border-emerald-500/40 transition-all shadow-xs"
+              title="Click to view full resolution"
+            >
+              <img
+                src={message.attachedImage}
+                alt="Uploaded input"
+                className="max-h-56 max-w-sm rounded-2xl object-cover group-hover/img:scale-[1.01] transition-transform duration-200"
+              />
+              <div className="absolute inset-0 bg-black/0 group-hover/img:bg-black/35 transition-colors flex items-center justify-center opacity-0 group-hover/img:opacity-100">
+                <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-neutral-900/85 text-white text-caption-1-medium border border-white/15 shadow-lg backdrop-blur-sm">
+                  <RiZoomInLine className="size-3.5 text-emerald-400" />
+                  <span>Click to Enlarge</span>
+                </span>
               </div>
-            )}
+            </div>
           </div>
         )}
 
-        {/* Attached document if present */}
+        {/* Attached PDF document if present */}
         {message.attachedDocument && (
-          <div className="message-attached-document" style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px',
-            padding: '10px 14px',
-            background: 'rgba(239, 68, 68, 0.06)',
-            border: '1px solid rgba(239, 68, 68, 0.25)',
-            borderRadius: '8px',
-            marginBottom: '12px',
-            width: 'fit-content',
-            maxWidth: '100%'
-          }}>
-            <div style={{ 
-              display: 'flex', 
-              flexDirection: 'column', 
-              alignItems: 'center', 
-              justifyContent: 'center',
-              background: 'rgba(239, 68, 68, 0.12)',
-              borderRadius: '6px',
-              padding: '6px 8px'
-            }}>
-              <FileText size={22} style={{ color: '#ef4444' }} />
-              <span style={{ fontSize: '9px', fontWeight: 700, color: '#ef4444', letterSpacing: '0.05em', marginTop: '-2px' }}>PDF</span>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <span style={{ fontWeight: 600, fontSize: '13.5px', color: 'var(--text-primary)', wordBreak: 'break-all' }}>
-                {message.attachedDocument.name}
-              </span>
-              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                PDF Document (Extracted & Indexed)
-              </span>
-            </div>
+          <div className="flex items-center gap-2.5 px-3.5 py-2 rounded-2xl bg-rose-500/10 border border-rose-500/25 text-text-primary text-caption-1-medium mb-1 shadow-xs">
+            <RiFilePdfLine className="size-5 text-rose-400 shrink-0" />
+            <span className="font-semibold max-w-xs truncate">{message.attachedDocument.name}</span>
           </div>
         )}
 
-        {/* Reasoning process accordion */}
-        {!isUser && message.reasoning && (
-          <ReasoningProcess
-            reasoning={message.reasoning}
-            steps={message.steps}
+        {/* User text bubble */}
+        {message.content && (
+          <div className="max-w-[80%] rounded-2xl bg-background-primary-default border border-border-button-default px-4 py-2.5 text-body-regular text-text-primary shadow-xs break-words">
+            {message.content}
+          </div>
+        )}
+
+        {/* Image Modal Lightbox */}
+        {message.attachedImage && (
+          <ImageLightboxModal
+            isOpen={imageModalOpen}
+            onClose={() => setImageModalOpen(false)}
+            src={message.attachedImage}
+            title="Uploaded Input Image"
           />
         )}
+      </div>
+    );
+  }
 
-        {/* Sending state */}
-        {message.status === 'sending' && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)' }}>
-            <span className="status-dot checking" />
-            <span style={{ fontSize: '13px', fontStyle: 'italic' }}>
-              Executing sovereign pipeline...
+  // Assistant message
+  return (
+    <div className="group/message flex gap-3.5 my-4 w-full animate-fadeIn">
+      {/* Avatar */}
+      <div className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-background-secondary-default border border-border-button-default text-emerald-400 shadow-xs mt-0.5">
+        <RiSparklingLine className="size-4.5" />
+      </div>
+
+      <div className="flex-1 min-w-0 space-y-2">
+        {/* Meta Header */}
+        <div className="flex items-center gap-2 text-caption-1-medium text-text-tertiary">
+          <span className="font-semibold text-text-primary">MRPL Sovereign AI</span>
+          <span>•</span>
+          <span>{formatTime(message.timestamp)}</span>
+          {message.model && (
+            <span className="px-2 py-0.5 rounded-full bg-background-secondary-default text-text-secondary text-[11px] border border-border-button-default">
+              {message.model}
             </span>
+          )}
+        </div>
+
+        {/* Attached Image (diagram or input) */}
+        {message.attachedImage && (
+          <div className="relative group/img inline-block max-w-lg my-1">
+            <div
+              onClick={() => setImageModalOpen(true)}
+              className="relative overflow-hidden rounded-2xl border border-border-button-default bg-background-secondary-default cursor-pointer hover:border-emerald-500/40 transition-all shadow-xs"
+              title="Click to view full resolution diagram"
+            >
+              <img
+                src={message.attachedImage}
+                alt="Model visual output"
+                className="max-h-80 max-w-full rounded-2xl object-cover group-hover/img:scale-[1.01] transition-transform duration-200"
+              />
+              <div className="absolute inset-0 bg-black/0 group-hover/img:bg-black/35 transition-colors flex items-center justify-center opacity-0 group-hover/img:opacity-100">
+                <span className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-neutral-900/85 text-white text-caption-1-medium border border-white/15 shadow-lg backdrop-blur-sm">
+                  <RiZoomInLine className="size-4 text-emerald-400" />
+                  <span>Click to Enlarge Diagram</span>
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Reasoning Process Drawer */}
+        {message.reasoning && (
+          <ReasoningProcess reasoning={message.reasoning} steps={message.steps} />
+        )}
+
+        {/* In-flight execution state */}
+        {message.status === 'sending' && (
+          <div className="flex items-center gap-2.5 py-1 text-text-secondary text-caption-1-regular">
+            <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="italic">Synthesizing telemetry & industrial knowledge...</span>
             <SendingTimer />
           </div>
         )}
 
         {/* Error state */}
         {message.status === 'error' && (
-          <div style={{
-            background: 'rgba(239, 68, 68, 0.1)',
-            border: '1px solid rgba(239, 68, 68, 0.25)',
-            borderRadius: '6px',
-            padding: '10px 14px',
-            color: '#fca5a5',
-            fontSize: '13px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '8px'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600 }}>
-              <AlertTriangle size={15} />
-              <span>Pipeline Failure</span>
+          <div className="flex flex-col gap-2 p-3 rounded-2xl bg-rose-500/10 border border-rose-500/25 text-rose-300 text-body-2-regular">
+            <div className="flex items-center gap-2 font-semibold">
+              <RiAlertLine className="size-4" />
+              <span>Pipeline Inference Failure</span>
             </div>
-            <div>{message.error || 'An error occurred during inference.'}</div>
+            <p>{message.error || 'An error occurred during sovereign model inference.'}</p>
             {onRetry && (
               <button
+                type="button"
                 onClick={onRetry}
-                className="btn-msg-action"
-                style={{
-                  alignSelf: 'flex-start',
-                  background: 'rgba(239, 68, 68, 0.2)',
-                  color: '#fee2e2',
-                  padding: '4px 8px',
-                  borderRadius: '4px'
-                }}
+                className="flex items-center gap-1.5 self-start px-2.5 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 text-caption-1-medium transition-colors"
               >
-                <RotateCcw size={12} />
+                <RiRestartLine className="size-3.5" />
                 <span>Retry Request</span>
               </button>
             )}
           </div>
         )}
 
-        {/* Markdown Content */}
+        {/* Main Content */}
         {message.content && (
-          <div className="message-bubble">
-            <MarkdownContent content={message.content} />
+          <div className="text-body-regular text-text-primary">
+            <MarkdownContent content={message.content} onCitationClick={onCitationClick} />
           </div>
         )}
 
-        {/* Message Actions */}
-        {message.status !== 'sending' && message.content && (
-          <div className="message-actions">
-            <button
-              className={`btn-msg-action ${copied ? 'copied' : ''}`}
-              onClick={handleCopyMessage}
-              type="button"
-              title="Copy message"
-            >
-              {copied ? (
-                <>
-                  <Check size={12} />
-                  <span>Copied</span>
-                </>
-              ) : (
-                <>
-                  <Copy size={12} />
-                  <span>Copy</span>
-                </>
-              )}
-            </button>
-          </div>
-        )}
-        
-        {/* Metrics UI */}
-        {message.metrics && (
-          <div style={{
-            display: 'flex',
-            gap: '12px',
-            marginTop: '12px',
-            paddingTop: '12px',
-            borderTop: '1px solid rgba(255, 255, 255, 0.05)',
-            alignItems: 'center'
-          }}>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              background: 'rgba(59, 130, 246, 0.1)',
-              padding: '4px 8px',
-              borderRadius: '6px',
-              border: '1px solid rgba(59, 130, 246, 0.2)',
-              color: 'rgba(147, 197, 253, 0.9)',
-              fontSize: '11.5px',
-              fontFamily: 'monospace'
-            }}>
-              <Zap size={13} style={{ color: '#60a5fa' }} />
-              <span>{message.metrics.tokensPerSecond.toFixed(1)} t/s</span>
+        {/* Action Row & Metrics */}
+        <div className="flex items-center justify-between pt-1 opacity-80 group-hover/message:opacity-100 transition-opacity">
+          {message.status !== 'sending' && message.content && (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleCopyMessage}
+                className={cx(
+                  'flex items-center gap-1 px-2 py-1 rounded-lg text-caption-1-medium text-text-tertiary hover:text-text-primary hover:bg-background-secondary-hover transition-colors cursor-pointer',
+                  copied && 'text-emerald-400 font-semibold'
+                )}
+                title="Copy response"
+              >
+                {copied ? (
+                  <>
+                    <RiCheckLine className="size-3.5" />
+                    <span>Copied</span>
+                  </>
+                ) : (
+                  <>
+                    <RiFileCopyLine className="size-3.5" />
+                    <span>Copy</span>
+                  </>
+                )}
+              </button>
             </div>
-            
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              background: 'rgba(168, 85, 247, 0.1)',
-              padding: '4px 8px',
-              borderRadius: '6px',
-              border: '1px solid rgba(168, 85, 247, 0.2)',
-              color: 'rgba(216, 180, 254, 0.9)',
-              fontSize: '11.5px',
-              fontFamily: 'monospace'
-            }}>
-              <Database size={13} style={{ color: '#c084fc' }} />
-              <span>{message.metrics.totalTokens} tokens</span>
+          )}
+
+          {message.metrics && (
+            <div className="flex items-center gap-3 font-mono text-[11px] text-text-tertiary">
+              <span className="flex items-center gap-1 text-sky-400">
+                <RiSpeedUpLine className="size-3" />
+                <span>{message.metrics.tokensPerSecond.toFixed(1)} t/s</span>
+              </span>
+              <span>•</span>
+              <span className="flex items-center gap-1 text-purple-400">
+                <RiDatabase2Line className="size-3" />
+                <span>{message.metrics.totalTokens} tokens</span>
+              </span>
             </div>
-          </div>
+          )}
+        </div>
+
+        {/* Lightbox Modal for Assistant Diagram / Visual Output */}
+        {message.attachedImage && (
+          <ImageLightboxModal
+            isOpen={imageModalOpen}
+            onClose={() => setImageModalOpen(false)}
+            src={message.attachedImage}
+            title={message.model ? `${message.model} Generated Diagram` : 'Generated Industrial Diagram'}
+          />
         )}
       </div>
     </div>

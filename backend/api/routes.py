@@ -30,15 +30,58 @@ async def status_check():
         except Exception:
             return "offline"
             
-    reasoning_res = "standby" if (settings.use_mock_providers or settings.use_mock_reasoning) else await check_provider(settings.reasoning_base_url)
+    if settings.use_mock_providers or settings.use_mock_reasoning:
+        primary_res = "standby"
+        fallback_res = "standby"
+        overall_reasoning = "standby"
+        active_model = "Mock-Reasoning"
+        fallback_active = False
+    else:
+        primary_res = await check_provider(settings.primary_reasoning_base_url)
+        fallback_res = await check_provider(settings.fallback_reasoning_base_url)
+        
+        if primary_res == "ok":
+            overall_reasoning = "ok"
+            active_model = settings.primary_reasoning_model_name
+            fallback_active = False
+        elif fallback_res == "ok":
+            overall_reasoning = "ok"
+            active_model = settings.fallback_reasoning_model_name
+            fallback_active = True
+        else:
+            overall_reasoning = "offline"
+            active_model = settings.primary_reasoning_model_name
+            fallback_active = False
+
     vision_res = "standby" if (settings.use_mock_providers or settings.use_mock_vision) else await check_provider(settings.vision_base_url)
     diagram_res = "standby" if settings.use_mock_providers else await check_provider(settings.diagram_base_url)
             
     return {
-        "reasoning": reasoning_res,
+        "reasoning": overall_reasoning,
+        "primary_reasoning": primary_res,
+        "fallback_reasoning": fallback_res,
+        "active_reasoning_model": active_model,
+        "reasoning_fallback_active": fallback_active,
         "vision": vision_res,
         "diagram": diagram_res,
-        "mode": "mock" if settings.use_mock_providers else "remote"
+        "mode": "mock" if settings.use_mock_providers else "remote",
+        "details": {
+            "primary_reasoning": {
+                "name": settings.primary_reasoning_model_name,
+                "url": settings.primary_reasoning_base_url,
+                "status": primary_res
+            },
+            "fallback_reasoning": {
+                "name": settings.fallback_reasoning_model_name,
+                "url": settings.fallback_reasoning_base_url,
+                "status": fallback_res
+            },
+            "vision": {
+                "name": settings.vision_model_name,
+                "url": settings.vision_base_url,
+                "status": vision_res
+            }
+        }
     }
 
 @router.post("/v1/providers/toggle")

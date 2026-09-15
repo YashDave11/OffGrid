@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useConversations } from './hooks/useConversations';
 import { useModelStatus } from './hooks/useModelStatus';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
@@ -6,10 +6,12 @@ import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { ChatArea } from './components/ChatArea';
 import { Composer } from './components/Composer';
+import { SidePanel } from './components/SidePanel';
+import { KnowledgeBase } from './components/KnowledgeBase';
 import { CommandPalette } from './components/CommandPalette';
 import { KeyboardShortcutsModal } from './components/KeyboardShortcutsModal';
 import { StatusDetailsModal } from './components/StatusDetailsModal';
-import { KnowledgeBase } from './components/KnowledgeBase';
+import { NotificationToastContainer, notify } from './components/NotificationToast';
 import { ChatMessage, TaskType, AnalyzeResponsePayload } from './types/workbench';
 
 export const App: React.FC = () => {
@@ -27,34 +29,28 @@ export const App: React.FC = () => {
     exportConversation,
   } = useConversations();
 
-  const { status, isChecking, refreshStatus } = useModelStatus();
+  const { status, isChecking, refreshStatus, toggleProviderMode } = useModelStatus();
 
   // Layout & UI States
   const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth > 768);
-  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
-    return (localStorage.getItem('mrpl_theme') as 'dark' | 'light') || 'dark';
-  });
+  const [sidePanelOpen, setSidePanelOpen] = useState(false);
+  const [sidePanelTab, setSidePanelTab] = useState<'kb' | 'trace'>('kb');
+  const [sidePanelFullscreen, setSidePanelFullscreen] = useState(false);
+  const [viewMode, setViewMode] = useState<'chat' | 'knowledge'>('chat');
+
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [shortcutsModalOpen, setShortcutsModalOpen] = useState(false);
   const [statusModalOpen, setStatusModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [activeDocumentId, setActiveDocumentId] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'chat' | 'knowledge'>('chat');
-
-  // Apply theme to document
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('mrpl_theme', theme);
-  }, [theme]);
-
-  const toggleTheme = useCallback(() => {
-    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
-  }, []);
 
   // Keyboard shortcuts
   useKeyboardShortcuts({
     onToggleCommandPalette: () => setCommandPaletteOpen((prev) => !prev),
-    onNewChat: () => createConversation(),
+    onNewChat: () => {
+      createConversation();
+      setViewMode('chat');
+    },
     onToggleSidebar: () => setSidebarOpen((prev) => !prev),
     onOpenShortcuts: () => setShortcutsModalOpen(true),
     onEscape: () => {
@@ -64,12 +60,37 @@ export const App: React.FC = () => {
     },
   });
 
+  // Extract latest retrieval trace from active conversation
+  const latestTraceData = useMemo(() => {
+    if (!activeConversation) return null;
+    for (let i = activeConversation.messages.length - 1; i >= 0; i--) {
+      const msg = activeConversation.messages[i];
+      if (msg.role === 'assistant' && (msg as any).ingestion_details?.retrieval) {
+        const details = (msg as any).ingestion_details;
+        return {
+          document_id: details.document_id,
+          source: details.retrieval.source,
+          top_k: details.retrieval.top_k,
+          threshold_applied: details.retrieval.threshold_applied,
+          chunks_injected: details.retrieval.chunks_injected,
+          timing: details.retrieval.timing,
+          sample_chunks: details.sample_chunks || [],
+        };
+      }
+    }
+    return null;
+  }, [activeConversation]);
+
   // Handle Send Message
-  const handleSendMessage = async (text: string, base64Image?: string, attachedDocument?: { name: string, data: string }, isDiagramMode?: boolean) => {
+  const handleSendMessage = async (
+    text: string,
+    base64Image?: string,
+    attachedDocument?: { name: string; data: string },
+    isDiagramMode?: boolean
+  ) => {
     if (isLoading) return;
 
     let convId = activeId;
-    // Create new conversation if none is active
     if (!convId || !conversations.some((c) => c.id === convId)) {
       convId = createConversation();
     }
@@ -88,7 +109,8 @@ export const App: React.FC = () => {
     addMessage(userMsg, convId);
 
     // Assistant placeholder
-    const assistantMessageId = 'asst_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
+    const assistantMessageId =
+      'asst_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
     const assistantMsg: ChatMessage = {
       id: assistantMessageId,
       role: 'assistant',
@@ -101,19 +123,17 @@ export const App: React.FC = () => {
     setIsLoading(true);
 
     const inputType: TaskType = attachedDocument ? 'document' : base64Image ? 'image' : 'text';
-    const content = attachedDocument ? attachedDocument.data : (base64Image || text);
-    
+    const content = attachedDocument ? attachedDocument.data : base64Image || text;
+
     if (attachedDocument) {
       setActiveDocumentId(null);
     }
-    
+
     if (isDiagramMode) {
       try {
         const response = await fetch('/v1/diagram/generate', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             topic: text,
             conversation_id: convId,
@@ -128,18 +148,26 @@ export const App: React.FC = () => {
         const blob = await response.blob();
         const objectUrl = URL.createObjectURL(blob);
 
-        updateMessage(assistantMessageId, {
-          status: 'completed',
-          model: 'Mihil Diagram API',
-          content: '',
-          attachedImage: objectUrl,
-        }, convId);
+        updateMessage(
+          assistantMessageId,
+          {
+            status: 'completed',
+            model: 'Mihil Diagram API',
+            content: '',
+            attachedImage: objectUrl,
+          },
+          convId
+        );
       } catch (err: any) {
         console.error('Diagram Error:', err);
-        updateMessage(assistantMessageId, {
-          status: 'error',
-          error: err.message || 'Diagram service offline.',
-        }, convId);
+        updateMessage(
+          assistantMessageId,
+          {
+            status: 'error',
+            error: err.message || 'Diagram service offline.',
+          },
+          convId
+        );
       } finally {
         setIsLoading(false);
       }
@@ -149,15 +177,13 @@ export const App: React.FC = () => {
     try {
       const response = await fetch('/v1/analyze', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           task: text,
           input_type: inputType,
           content: content,
           document_name: attachedDocument ? attachedDocument.name : undefined,
-          document_id: (!attachedDocument && activeDocumentId) ? activeDocumentId : undefined,
+          document_id: !attachedDocument && activeDocumentId ? activeDocumentId : undefined,
           conversation_id: convId,
         }),
       });
@@ -165,7 +191,9 @@ export const App: React.FC = () => {
       const data: AnalyzeResponsePayload = await response.json();
 
       if (!response.ok) {
-        throw new Error((data as unknown as { detail?: string }).detail || 'Inference execution failed');
+        throw new Error(
+          (data as unknown as { detail?: string }).detail || 'Inference execution failed'
+        );
       }
 
       // Parse <think>...</think> reasoning process
@@ -178,16 +206,16 @@ export const App: React.FC = () => {
         reasoning = thinkMatch[1].trim();
         rawResult = rawResult.replace(thinkRegex, '').trim();
       }
-      
+
       if (data.ingestion_details?.document_id) {
         setActiveDocumentId(data.ingestion_details.document_id);
       }
-      
+
       let metrics;
       if (data.ingestion_details && data.ingestion_details.usage) {
         metrics = {
           totalTokens: data.ingestion_details.usage.total_tokens || 0,
-          tokensPerSecond: data.ingestion_details.timings?.predicted_per_second || 0
+          tokensPerSecond: data.ingestion_details.timings?.predicted_per_second || 0,
         };
       }
 
@@ -201,9 +229,19 @@ export const App: React.FC = () => {
           taskType: data.task_type as TaskType,
           steps: data.steps,
           metrics: metrics,
-        },
+          ...(data.ingestion_details ? { ingestion_details: data.ingestion_details } : {}),
+        } as any,
         convId
       );
+
+      if (data.model?.includes('Fallback') || data.ingestion_details?.fallback_used) {
+        notify({
+          title: 'Reasoning Fallback Used',
+          description: 'Primary model Qwen2.5-1.5B (192.168.0.5:8080) was unavailable. We have fallen back to the current model we are using for reasoning (Qwen3-4B-Thinking).',
+          status: 'warning',
+          duration: 7000,
+        });
+      }
     } catch (err: unknown) {
       const errorMsg = err instanceof Error ? err.message : 'Unknown pipeline error';
       updateMessage(
@@ -226,19 +264,30 @@ export const App: React.FC = () => {
     if (msgIdx <= 0) return;
     const prevUserMsg = activeConversation.messages[msgIdx - 1];
     if (prevUserMsg && prevUserMsg.role === 'user') {
-      handleSendMessage(prevUserMsg.content, prevUserMsg.attachedImage, prevUserMsg.attachedDocument);
+      handleSendMessage(
+        prevUserMsg.content,
+        prevUserMsg.attachedImage,
+        prevUserMsg.attachedDocument
+      );
     }
+  };
+
+  // Citation click handler
+  const handleCitationClick = (_docName: string, _page?: string) => {
+    setSidePanelTab('trace');
+    setSidePanelOpen(true);
   };
 
   const currentTitle = activeConversation?.title || 'New Conversation';
   const currentMessages = activeConversation?.messages || [];
+  const lastAssistantMessage = [...currentMessages].reverse().find((m) => m.role === 'assistant');
 
   return (
-    <div className="app-layout" data-theme={theme}>
-      {/* Collapsible Sidebar */}
+    <div className="flex h-screen w-screen overflow-hidden bg-background-full text-text-primary antialiased select-none font-sans">
+      {/* Floating BoardUI Sidebar */}
       <Sidebar
         isOpen={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
+        onToggle={() => setSidebarOpen((prev) => !prev)}
         conversations={conversations}
         activeId={activeId}
         onSelectConversation={(id) => {
@@ -252,13 +301,17 @@ export const App: React.FC = () => {
         onDeleteConversation={(id) => deleteConversation(id)}
         onRenameConversation={(id, newTitle) => renameConversation(id, newTitle)}
         onOpenKnowledgeBase={() => {
-          setViewMode('knowledge');
-          if (window.innerWidth <= 768) setSidebarOpen(false);
+          setSidePanelTab('kb');
+          setSidePanelOpen(true);
         }}
+        activeView={viewMode}
+        status={status}
+        onOpenStatusModal={() => setStatusModalOpen(true)}
+        onToggleProviderMode={toggleProviderMode}
       />
 
-      {/* Main Chat Workspace */}
-      <main className="workspace">
+      {/* Main Column */}
+      <main className="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative">
         <Header
           sidebarCollapsed={!sidebarOpen}
           onToggleSidebar={() => setSidebarOpen((prev) => !prev)}
@@ -270,38 +323,63 @@ export const App: React.FC = () => {
           onOpenStatusModal={() => setStatusModalOpen(true)}
           onOpenCommandPalette={() => setCommandPaletteOpen(true)}
           onOpenShortcutsModal={() => setShortcutsModalOpen(true)}
-          isDarkTheme={theme === 'dark'}
-          onToggleTheme={toggleTheme}
+          isSidePanelOpen={sidePanelOpen}
+          onToggleSidePanel={() => setSidePanelOpen((prev) => !prev)}
         />
 
         {viewMode === 'knowledge' ? (
-          <KnowledgeBase />
+          <KnowledgeBase onBackToChat={() => setViewMode('chat')} />
         ) : (
-          <>
+          <div className="flex-1 flex flex-col min-h-0 overflow-hidden relative">
             <ChatArea
               messages={currentMessages}
               onSelectStarterPrompt={(prompt) => handleSendMessage(prompt)}
               onRetryMessage={handleRetryMessage}
+              onCitationClick={handleCitationClick}
             />
 
             <Composer
               onSendMessage={handleSendMessage}
               isLoading={isLoading}
+              activeModel={
+                status.reasoning_fallback_active
+                  ? 'Qwen3-4B (Fallback)'
+                  : status.active_reasoning_model || lastAssistantMessage?.model || 'Qwen2.5-1.5B'
+              }
+              isMockMode={status.mode === 'mock'}
+              lastMetrics={lastAssistantMessage?.metrics}
             />
-          </>
+          </div>
         )}
       </main>
+
+      {/* Third Side Panel (Knowledge Base + RAG Trace) */}
+      <SidePanel
+        isOpen={sidePanelOpen}
+        onClose={() => setSidePanelOpen(false)}
+        activeTab={sidePanelTab}
+        onTabChange={(tab) => setSidePanelTab(tab)}
+        isFullscreen={sidePanelFullscreen}
+        onToggleFullscreen={() => setSidePanelFullscreen((prev) => !prev)}
+        traceData={latestTraceData}
+      />
 
       {/* Modals */}
       <CommandPalette
         isOpen={commandPaletteOpen}
         onClose={() => setCommandPaletteOpen(false)}
         conversations={conversations}
-        onSelectConversation={(id) => setActiveId(id)}
-        onNewChat={() => createConversation()}
+        onSelectConversation={(id) => {
+          setActiveId(id);
+          setViewMode('chat');
+        }}
+        onNewChat={() => {
+          createConversation();
+          setViewMode('chat');
+        }}
         onToggleSidebar={() => setSidebarOpen((prev) => !prev)}
-        onToggleTheme={toggleTheme}
-        isDarkTheme={theme === 'dark'}
+        onToggleTheme={() => {}}
+        isDarkTheme={true}
         onOpenStatusModal={() => setStatusModalOpen(true)}
         onOpenShortcutsModal={() => setShortcutsModalOpen(true)}
         onExportChat={(format) => {
@@ -322,7 +400,11 @@ export const App: React.FC = () => {
         status={status}
         isChecking={isChecking}
         onRefresh={refreshStatus}
+        onToggleProviderMode={toggleProviderMode}
       />
+
+      {/* Floating System Notifications (Model Online/Offline/Fallback) */}
+      <NotificationToastContainer />
     </div>
   );
 };

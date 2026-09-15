@@ -1,11 +1,27 @@
 export type TaskType = 'text' | 'image' | 'document';
 
-export type ProviderStatus = 'ok' | 'offline' | 'unconfigured' | 'checking';
+export type ProviderStatus = 'ok' | 'offline' | 'unconfigured' | 'checking' | 'standby';
+
+export interface ModelDetail {
+  name: string;
+  url: string;
+  status: ProviderStatus;
+}
 
 export interface SystemStatus {
   reasoning: ProviderStatus;
   vision: ProviderStatus;
   lastChecked: number | null;
+  mode?: 'mock' | 'remote';
+  primary_reasoning?: ProviderStatus;
+  fallback_reasoning?: ProviderStatus;
+  active_reasoning_model?: string;
+  reasoning_fallback_active?: boolean;
+  details?: {
+    primary_reasoning?: ModelDetail;
+    fallback_reasoning?: ModelDetail;
+    vision?: ModelDetail;
+  };
 }
 
 export interface ChatMessage {

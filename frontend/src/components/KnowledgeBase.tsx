@@ -1,5 +1,17 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Upload, FileText, Loader2, Library, CheckCircle2, Trash2, Image } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import {
+  RiBookOpenLine,
+  RiDeleteBinLine,
+  RiFilePdfLine,
+  RiImageLine,
+  RiCheckLine,
+  RiRefreshLine,
+  RiArrowLeftLine,
+} from '@remixicon/react';
+import { FileUpload } from './base/file-upload/file-upload';
+import { StatusDot } from './base/badges/status-dot';
+import { useCountUp } from '../hooks/useCountUp';
+import { cx } from '@/utils/cx';
 
 interface KBDocument {
   document_name: string;
@@ -8,12 +20,14 @@ interface KBDocument {
   chunks: number;
 }
 
-export const KnowledgeBase: React.FC = () => {
+interface KnowledgeBaseProps {
+  onBackToChat?: () => void;
+}
+
+export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ onBackToChat }) => {
   const [documents, setDocuments] = useState<KBDocument[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isUploading, setIsUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<string>('');
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchDocuments = async () => {
     try {
@@ -35,14 +49,20 @@ export const KnowledgeBase: React.FC = () => {
   }, []);
 
   const handleDeleteDocument = async (document_id: string, document_name: string) => {
-    if (!window.confirm(`Are you sure you want to delete "${document_name}" from the Knowledge Base? This will remove all its embedded chunks permanently.`)) {
+    if (
+      !window.confirm(
+        `Are you sure you want to delete "${document_name}" from the Knowledge Base? All indexed vector embeddings will be permanently purged.`
+      )
+    ) {
       return;
     }
 
     try {
-      setDocuments(docs => docs.map(d => d.document_id === document_id ? { ...d, status: 'Deleting...' } : d));
+      setDocuments((docs) =>
+        docs.map((d) => (d.document_id === document_id ? { ...d, status: 'Deleting...' } : d))
+      );
       const res = await fetch(`/v1/knowledge/documents/${document_id}`, {
-        method: 'DELETE'
+        method: 'DELETE',
       });
       if (res.ok) {
         await fetchDocuments();
@@ -57,139 +77,198 @@ export const KnowledgeBase: React.FC = () => {
     }
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (file.type !== 'application/pdf' && !file.type.startsWith('image/')) {
-      alert('Only PDF and image files are supported for the Knowledge Base.');
-      return;
-    }
-
-    setIsUploading(true);
-    setUploadStatus('Uploading...');
-
+  const handleFileUpload = async (file: File) => {
+    setUploadStatus('Uploading & Indexing...');
     try {
       const reader = new FileReader();
       reader.onload = async (event) => {
         const base64Data = (event.target?.result as string).split(',')[1];
-        setUploadStatus('Processing & Indexing...');
-        
         const res = await fetch('/v1/knowledge/upload', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             document_name: file.name,
-            content: base64Data
-          })
+            content: base64Data,
+          }),
         });
 
         if (res.ok) {
           const data = await res.json();
-          setUploadStatus(data.details?.knowledge_base === 'duplicate' 
-            ? 'Document already exists in Knowledge Base' 
-            : 'Indexed ✓');
+          setUploadStatus(
+            data.details?.knowledge_base === 'duplicate'
+              ? 'Document already exists in Knowledge Base'
+              : 'Indexed ✓'
+          );
           await fetchDocuments();
         } else {
-          setUploadStatus('Failed');
+          setUploadStatus('Upload failed');
         }
       };
       reader.readAsDataURL(file);
     } catch (err) {
       console.error(err);
-      setUploadStatus('Failed');
+      setUploadStatus('Upload failed');
     } finally {
-      setTimeout(() => {
-        setIsUploading(false);
-        setUploadStatus('');
-      }, 3000);
-      if (fileInputRef.current) fileInputRef.current.value = '';
+      setTimeout(() => setUploadStatus(''), 4000);
     }
   };
 
+  const totalChunks = documents.reduce((sum, d) => sum + (d.chunks || 0), 0);
+  const animatedChunks = useCountUp(totalChunks, 400);
+
   return (
-    <div className="kb-container" style={{ padding: '2rem', maxWidth: '800px', margin: '0 auto', width: '100%' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '2rem' }}>
-        <Library size={24} style={{ color: 'var(--text-primary)' }} />
-        <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 600, color: 'var(--text-primary)' }}>Knowledge Base</h1>
+    <div className="flex-1 overflow-y-auto p-6 max-w-4xl mx-auto w-full space-y-6">
+      {/* Top Header */}
+      <div className="flex items-center justify-between pb-4 border-b border-border-separator-border">
+        <div className="flex items-center gap-3">
+          {onBackToChat && (
+            <button
+              type="button"
+              onClick={onBackToChat}
+              className="p-2 rounded-xl bg-background-secondary-default border border-border-button-default text-text-secondary hover:text-text-primary hover:bg-background-secondary-hover transition-colors"
+              title="Return to Chat"
+            >
+              <RiArrowLeftLine className="size-4" />
+            </button>
+          )}
+          <div className="flex size-10 items-center justify-center rounded-2xl bg-accent-500/10 text-accent-500 border border-accent-500/20 shadow-xs">
+            <RiBookOpenLine className="size-5" />
+          </div>
+          <div>
+            <h1 className="text-title-2-medium font-bold text-text-primary">Knowledge Base</h1>
+            <p className="text-caption-1-regular text-text-secondary">
+              Persistent sovereign embeddings indexed with FAISS FlatIP.
+            </p>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={fetchDocuments}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-background-secondary-default border border-border-button-default text-caption-1-medium text-text-secondary hover:text-text-primary hover:bg-background-secondary-hover transition-colors"
+        >
+          <RiRefreshLine className={cx('size-3.5', isLoading && 'animate-spin')} />
+          <span>Refresh</span>
+        </button>
       </div>
 
-      <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '1.5rem', marginBottom: '2rem' }}>
-        <h3 style={{ margin: '0 0 1rem 0', color: 'var(--text-primary)' }}>Add to Knowledge Base</h3>
-        <p style={{ margin: '0 0 1.5rem 0', color: 'var(--text-muted)', fontSize: '14px' }}>
-          Upload PDF or image files to automatically embed and index them for global retrieval.
+      {/* KPI Stats */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+        <div className="p-4 rounded-3xl bg-background-secondary-default border border-border-button-default shadow-xs space-y-1">
+          <span className="text-caption-1-regular text-text-tertiary">Indexed Documents</span>
+          <div className="text-title-2-medium font-bold text-text-primary">{documents.length}</div>
+        </div>
+
+        <div className="p-4 rounded-3xl bg-background-secondary-default border border-border-button-default shadow-xs space-y-1">
+          <span className="text-caption-1-regular text-text-tertiary">Total Chunks</span>
+          <div className="text-title-2-medium font-bold text-emerald-400 font-mono">
+            {animatedChunks}
+          </div>
+        </div>
+
+        <div className="p-4 rounded-3xl bg-background-secondary-default border border-border-button-default shadow-xs space-y-1 col-span-2 sm:col-span-1">
+          <span className="text-caption-1-regular text-text-tertiary">Vector Device</span>
+          <div className="text-body-medium font-bold text-text-primary uppercase tracking-wide">
+            CPU (BAAI/bge-small)
+          </div>
+        </div>
+      </div>
+
+      {/* Upload Box */}
+      <div className="p-5 rounded-3xl bg-background-secondary-default border border-border-button-default shadow-xs space-y-3">
+        <h3 className="text-body-medium font-semibold text-text-primary">
+          Add New Industrial Document
+        </h3>
+        <p className="text-caption-1-regular text-text-secondary">
+          Upload PDF reports, P&ID drawings, or technical spec sheets to embed and index them for
+          cross-document RAG.
         </p>
-        
-        <input 
-          type="file" 
-          accept=".pdf,.png,.jpg,.jpeg,.webp" 
-          ref={fileInputRef} 
-          style={{ display: 'none' }} 
-          onChange={handleFileUpload} 
+
+        <FileUpload
+          onUploadComplete={handleFileUpload}
+          allowedExtensions={['pdf', 'png', 'jpg', 'jpeg', 'webp']}
+          maxBytes={50 * 1024 * 1024}
         />
-        
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <button 
-            className="btn-primary"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isUploading}
-            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', background: 'var(--accent-primary)', color: 'white', border: 'none', borderRadius: '4px', cursor: isUploading ? 'not-allowed' : 'pointer' }}
-          >
-            {isUploading ? <Loader2 size={16} className="spin" /> : <Upload size={16} />}
-            {isUploading ? 'Uploading...' : '+ Add File'}
-          </button>
-          
-          {uploadStatus && (
-            <span style={{ fontSize: '14px', color: uploadStatus === 'Failed' ? 'var(--accent-red)' : 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-              {uploadStatus === 'Indexed ✓' && <CheckCircle2 size={14} style={{ color: 'var(--accent-green)' }} />}
-              {uploadStatus}
-            </span>
-          )}
-        </div>
+
+        {uploadStatus && (
+          <div className="text-caption-1-medium text-emerald-400 flex items-center gap-1.5 pt-1">
+            <RiCheckLine className="size-4" />
+            <span>{uploadStatus}</span>
+          </div>
+        )}
       </div>
 
-      <div>
-        <h3 style={{ margin: '0 0 1rem 0', color: 'var(--text-primary)' }}>Documents</h3>
-        <div style={{ borderTop: '1px solid var(--border-color)' }}>
-          {isLoading ? (
-            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-              <Loader2 size={24} className="spin" style={{ margin: '0 auto' }} />
-            </div>
-          ) : documents.length === 0 ? (
-            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '14px' }}>
-              No documents in Knowledge Base yet.
-            </div>
-          ) : (
-            documents.map((doc, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '1rem 0', borderBottom: '1px solid var(--border-color)' }}>
-                {doc.document_name.toLowerCase().match(/\.(png|jpe?g|webp)$/) ? (
-                  <Image size={20} style={{ color: 'var(--accent-amber)', marginTop: '2px' }} />
-                ) : (
-                  <FileText size={20} style={{ color: 'var(--accent-amber)', marginTop: '2px' }} />
-                )}
-                <div>
-                  <div style={{ fontWeight: 500, color: 'var(--text-primary)', marginBottom: '4px' }}>{doc.document_name}</div>
-                  <div style={{ fontSize: '13px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ color: doc.status.includes('Deleting') ? 'var(--accent-red)' : 'var(--accent-green)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      {doc.status.includes('Deleting') ? <Loader2 size={12} className="spin" /> : <CheckCircle2 size={12} />} {doc.status}
-                    </span>
-                    <span>•</span>
-                    <span>Chunks: {doc.chunks}</span>
+      {/* Document List */}
+      <div className="space-y-3">
+        <h3 className="text-body-medium font-semibold text-text-primary">Catalog Documents</h3>
+
+        {isLoading && documents.length === 0 ? (
+          <div className="py-12 text-center text-caption-1-regular text-text-tertiary">
+            Loading document catalog...
+          </div>
+        ) : documents.length === 0 ? (
+          <div className="p-8 rounded-3xl bg-background-secondary-default border border-border-button-default text-center text-caption-1-regular text-text-tertiary">
+            No documents in Knowledge Base yet.
+          </div>
+        ) : (
+          <div className="rounded-3xl bg-background-secondary-default border border-border-button-default overflow-hidden shadow-xs">
+            <div className="divide-y divide-border-separator-border">
+              {documents.map((doc) => {
+                const isImage = doc.document_name.toLowerCase().match(/\.(png|jpe?g|webp)$/);
+                const isDeleting = doc.status.includes('Deleting');
+
+                return (
+                  <div
+                    key={doc.document_id}
+                    className="flex items-center justify-between p-4 hover:bg-background-secondary-hover/50 transition-colors"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div
+                        className={cx(
+                          'flex size-9 shrink-0 items-center justify-center rounded-xl',
+                          isImage ? 'bg-sky-500/10 text-sky-400' : 'bg-rose-500/10 text-rose-400'
+                        )}
+                      >
+                        {isImage ? (
+                          <RiImageLine className="size-4.5" />
+                        ) : (
+                          <RiFilePdfLine className="size-4.5" />
+                        )}
+                      </div>
+
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-body-2-medium font-semibold text-text-primary truncate">
+                          {doc.document_name}
+                        </span>
+                        <div className="flex items-center gap-2 text-caption-1-regular text-text-tertiary">
+                          <span className="flex items-center gap-1">
+                            <StatusDot
+                              status={isDeleting ? 'offline' : 'online'}
+                              className="size-1.5"
+                            />
+                            <span>{doc.status}</span>
+                          </span>
+                          <span>•</span>
+                          <span className="font-mono text-emerald-400">{doc.chunks} chunks</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteDocument(doc.document_id, doc.document_name)}
+                      disabled={isDeleting}
+                      className="p-2 rounded-xl text-text-tertiary hover:text-text-error-primary hover:bg-background-tertiary-default transition-colors"
+                      title="Delete document"
+                    >
+                      <RiDeleteBinLine className="size-4.5" />
+                    </button>
                   </div>
-                </div>
-                <button 
-                  onClick={() => handleDeleteDocument(doc.document_id, doc.document_name)}
-                  disabled={doc.status.includes('Deleting')}
-                  style={{ marginLeft: 'auto', background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: doc.status.includes('Deleting') ? 'not-allowed' : 'pointer', padding: '4px', borderRadius: '4px' }}
-                  title="Delete Document"
-                  className="hover-bg"
-                >
-                  <Trash2 size={18} />
-                </button>
-              </div>
-            ))
-          )}
-        </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

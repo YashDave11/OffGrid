@@ -10,8 +10,13 @@ class Settings(BaseSettings):
     use_mock_reasoning: bool = False
     use_mock_vision: bool = False
     
-    reasoning_base_url: str = "http://192.168.0.2:8080"
-    reasoning_model_name: str = "Qwen3-4B-Thinking-2507"
+    primary_reasoning_base_url: str = "http://192.168.0.5:8080"
+    primary_reasoning_model_name: str = "qwen2.5-1.5b-instruct-q4_k_m.gguf"
+    fallback_reasoning_base_url: str = "http://192.168.0.2:8080"
+    fallback_reasoning_model_name: str = "Qwen3-4B-Thinking-2507"
+
+    reasoning_base_url: str = "http://192.168.0.5:8080"
+    reasoning_model_name: str = "qwen2.5-1.5b-instruct-q4_k_m.gguf"
     reasoning_max_tokens: int = 8192
     reasoning_budget: int = 2048
     

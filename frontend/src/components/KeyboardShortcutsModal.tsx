@@ -1,5 +1,6 @@
 import React from 'react';
-import { X, Keyboard } from 'lucide-react';
+import { RiCloseLine, RiKeyboardLine } from '@remixicon/react';
+import { Kbd } from './base/kbd/kbd';
 
 interface KeyboardShortcutsModalProps {
   isOpen: boolean;
@@ -23,31 +24,42 @@ export const KeyboardShortcutsModal: React.FC<KeyboardShortcutsModalProps> = ({
   ];
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="standard-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <div className="modal-title">
-            <Keyboard size={16} />
-            <span>Keyboard Shortcuts</span>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fadeIn"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-md rounded-3xl bg-background-secondary-default border border-border-button-default shadow-2xl p-6 space-y-4 animate-scaleUp text-text-primary"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between pb-3 border-b border-border-separator-border">
+          <div className="flex items-center gap-2.5">
+            <div className="flex size-8 items-center justify-center rounded-xl bg-accent-500/10 text-accent-500">
+              <RiKeyboardLine className="size-5" />
+            </div>
+            <h3 className="text-body-medium font-semibold text-text-primary">
+              Keyboard Shortcuts
+            </h3>
           </div>
-          <button className="btn-modal-close" onClick={onClose} aria-label="Close">
-            <X size={16} />
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1.5 rounded-xl text-foreground-icon-secondary hover:text-text-primary hover:bg-background-tertiary-default transition-colors"
+          >
+            <RiCloseLine className="size-5" />
           </button>
         </div>
 
-        <div className="modal-body">
-          <table className="shortcuts-table">
-            <tbody>
-              {shortcuts.map((s) => (
-                <tr key={s.key}>
-                  <td style={{ color: 'var(--text-secondary)' }}>{s.description}</td>
-                  <td style={{ textAlign: 'right' }}>
-                    <span className="kbd-hint">{s.key}</span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="divide-y divide-border-separator-border">
+          {shortcuts.map((s) => (
+            <div
+              key={s.key}
+              className="flex items-center justify-between py-2.5 text-body-2-regular"
+            >
+              <span className="text-text-secondary">{s.description}</span>
+              <Kbd>{s.key}</Kbd>
+            </div>
+          ))}
         </div>
       </div>
     </div>
